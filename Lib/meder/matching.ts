@@ -32,10 +32,12 @@ export type MederPlace = {
   description?: string;
 
   // Location
-  latitude: number;
-  longitude: number;
-  distance?: string;
-  address?: string;
+  // Location
+latitude: number;
+longitude: number;
+distance?: string;
+travelTime?: string;
+address?: string;
 
 
   // Ratings
