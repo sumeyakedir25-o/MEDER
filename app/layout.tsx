@@ -18,11 +18,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
-        <div className="min-h-screen">
+      <body className="overflow-x-hidden">
+        <div className="min-h-screen w-full overflow-x-hidden">
           <Header />
 
-          <main>{children}</main>
+          {children}
 
           <footer id="site-footer">
             {/* MEDER footer will be built later */}

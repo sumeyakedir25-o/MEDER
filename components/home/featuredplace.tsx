@@ -64,11 +64,11 @@ export default function FeaturedPlaces() {
           </button>
         </div>
 
-        <div className="flex gap-3 overflow-x-auto pb-2 lg:grid lg:grid-cols-4 lg:overflow-visible">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {featuredPlaces.map((place) => (
             <article
               key={place.name}
-              className="group min-w-[220px] overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] transition hover:-translate-y-1 hover:border-[#D4AF37]/30 md:min-w-0"
+              className="group w-full overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] transition hover:-translate-y-1 hover:border-[#D4AF37]/30"
             >
               <div className="relative aspect-[16/10] overflow-hidden">
                 <Image

@@ -86,7 +86,7 @@ export default function Header() {
           </Link>
 
           <Link
-            href="/favorites"
+            href="/saved"
             aria-label="Saved places"
             className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:bg-white/5 hover:text-[#D4AF37]"
           >
@@ -180,7 +180,7 @@ export default function Header() {
             <div className="my-2 h-px bg-white/10" />
 
             <Link
-              href="/favorites"
+              href="/saved"
               onClick={closeMenu}
               className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white/80 transition hover:bg-white/5 hover:text-white"
             >
