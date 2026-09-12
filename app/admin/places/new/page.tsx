@@ -1,6 +1,12 @@
  "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { createClient } from "@/Lib/supabase/client";
 import {
   ArrowLeft,
@@ -315,7 +321,7 @@ function MultiSelect({
   );
 }
 
-export default function NewPlacePage() {
+function NewPlacePage() {
   const supabase = createClient();
   const searchParams = useSearchParams();
 const editId = searchParams.get("edit");
@@ -1582,5 +1588,20 @@ const { error } = isEditing
         </form>
       </div>
     </main>
+  );
+}
+export default function NewPlacePageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#050505] px-5 py-16 text-white md:px-8">
+          <div className="mx-auto max-w-7xl text-center text-sm text-white/40">
+            Loading place manager...
+          </div>
+        </main>
+      }
+    >
+      <NewPlacePage />
+    </Suspense>
   );
 }
