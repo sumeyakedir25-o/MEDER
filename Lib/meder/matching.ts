@@ -39,6 +39,10 @@ distance?: string;
 travelTime?: string;
 address?: string;
 
+communityVideos?: {
+  title: string;
+  url: string;
+}[];
 
   // Ratings
   rating: number;
@@ -82,7 +86,10 @@ menu? : MenuCategory[];
   };
 
   // Experiences
-  experiences?: string[];
+  experiences?: {
+  label: string;
+  count: number;
+}[];
 
   // Community videos
   videos?: {

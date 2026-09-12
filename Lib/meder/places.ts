@@ -109,19 +109,17 @@ payment: [
   },
 ],
 
-    experiences: [
-      "Great for dates",
-      "Good with friends",
-      "City views",
-      "Lively at night",
-    ],
-
-    videos: [
-      {
-        title: "Sky Lounge experience",
-        url: "https://tiktok.com",
-      },
-    ],
+  
+    communityVideos: [
+  {
+    title: "Sky Lounge experience",
+    url: "https://www.tiktok.com/@someone/video/123456",
+  },
+  {
+    title: "A night at Sky Lounge",
+    url: "https://www.tiktok.com/@anotherperson/video/987654",
+  },
+],
 
     verified: true,
     lastVerified: "August 2026",
@@ -234,11 +232,7 @@ payment: [
   },
 ],
 
-    experiences: [
-      "Good for solo visits",
-      "Quiet atmosphere",
-      "Coffee lovers",
-    ],
+  
 
     verified: true,
     lastVerified: "August 2026",
@@ -353,11 +347,7 @@ payment: [
   },
 ],
 
-    experiences: [
-      "Great for groups",
-      "Traditional Ethiopian experience",
-      "Live entertainment",
-    ],
+    
 
     verified: true,
     lastVerified: "August 2026",
@@ -471,11 +461,7 @@ payment: [
   },
 ],
 
-    experiences: [
-      "Good for families",
-      "Casual dining",
-      "Affordable Ethiopian food",
-    ],
+  
 
     verified: true,
     lastVerified: "August 2026",
