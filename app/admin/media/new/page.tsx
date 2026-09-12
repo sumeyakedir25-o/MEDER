@@ -1,12 +1,18 @@
  "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import {
+  ChangeEvent,
+  FormEvent,
+  Suspense,
+  useEffect,
+  useState,
+} from "react";
 import Link from "next/link";
 import { ArrowLeft, ImagePlus, Save, Upload, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/Lib/supabase/client";
 
-export default function AdminMediaNewPage() {
+function AdminMediaNewPage() {
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -613,5 +619,21 @@ export default function AdminMediaNewPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function AdminMediaNewPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#050505] px-5 py-16 text-white md:px-8">
+          <div className="mx-auto max-w-4xl text-center text-sm text-white/40">
+            Loading media manager...
+          </div>
+        </main>
+      }
+    >
+      <AdminMediaNewPage />
+    </Suspense>
   );
 }
