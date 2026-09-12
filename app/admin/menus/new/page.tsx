@@ -1,6 +1,11 @@
  "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import {
+  FormEvent,
+  Suspense,
+  useEffect,
+  useState,
+} from "react";
 import Link from "next/link";
 import { ArrowLeft, Save, Utensils } from "lucide-react";
 import { createClient } from "@/Lib/supabase/client";
@@ -26,8 +31,7 @@ type Offering = {
   is_available: boolean;
   sort_order: number;
 };
-
-export default function NewOfferingPage() {
+function NewOfferingPage() {
   const supabase = createClient();
   const searchParams = useSearchParams();
 
@@ -606,5 +610,20 @@ export default function NewOfferingPage() {
         </form>
       </div>
     </main>
+  );
+}
+export default function NewOfferingPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#050505] px-5 py-16 text-white md:px-8">
+          <div className="mx-auto max-w-5xl text-center text-sm text-white/40">
+            Loading offering manager...
+          </div>
+        </main>
+      }
+    >
+      <NewOfferingPage />
+    </Suspense>
   );
 }
