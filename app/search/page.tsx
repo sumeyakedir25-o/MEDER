@@ -1,7 +1,7 @@
  "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -13,7 +13,7 @@ import {
 import SearchInput from "@/components/ui/SearchInput";
 import { mederPlaces } from "@/Lib/meder/places";
 
-export default function SearchPage() {
+function SearchPage() {
   const searchParams = useSearchParams();
 
   const urlQuery = searchParams.get("q") ?? "";
@@ -659,5 +659,20 @@ urlLng,
         )}
       </div>
     </main>
+  );
+}
+export default function SearchPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-black px-5 py-16 text-white">
+          <div className="mx-auto max-w-6xl text-center text-sm text-white/40">
+            Loading search...
+          </div>
+        </main>
+      }
+    >
+      <SearchPage />
+    </Suspense>
   );
 }
