@@ -1,6 +1,6 @@
  "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/Lib/supabase/client";
@@ -69,7 +69,7 @@ function createSlug(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-export default function AdminCategoryFormPage() {
+function AdminCategoryFormPage() {
   const supabase = createClient();
   const searchParams = useSearchParams();
 
@@ -412,5 +412,20 @@ export default function AdminCategoryFormPage() {
         </form>
       </div>
     </main>
+  );
+}
+export default function AdminCategoryFormPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#050505] px-5 py-16 text-white md:px-8">
+          <div className="mx-auto max-w-3xl text-center text-sm text-white/40">
+            Loading category...
+          </div>
+        </main>
+      }
+    >
+      <AdminCategoryFormPage />
+    </Suspense>
   );
 }
