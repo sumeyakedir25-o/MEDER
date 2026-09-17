@@ -271,7 +271,7 @@ export default function AdminBusinessesPage() {
 
                           {claim.phone && (
                             <p>
-[10/09/2026 16:17] Meder.code: <span className="text-white/40">
+ <span className="text-white/40">
                                 Phone:
                               </span>{" "}
                               {claim.phone}

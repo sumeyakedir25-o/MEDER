@@ -83,7 +83,7 @@ export default function PlaceCard({
         </div>
 
         <Link
-          href={`/place/${place.id}`}
+          href={`/places/${place.id}`}
           className="mt-5 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-[#D4AF37]/40 px-5 text-sm font-medium text-[#D4AF37] transition hover:bg-[#D4AF37]/10"
         >
           View Details

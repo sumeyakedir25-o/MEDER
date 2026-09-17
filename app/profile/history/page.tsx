@@ -10,7 +10,7 @@ import {
   Sparkles,
   Star,
 } from "lucide-react";
-import { mederPlaces } from "@/Lib/meder/places";
+import { createClient } from "@/Lib/supabase/client";
 
 interface RecommendationHistoryItem {
   id: string;
@@ -19,8 +19,19 @@ interface RecommendationHistoryItem {
   placeIds?: string[];
 }
 
+interface HistoryPlace {
+  id: string;
+  name: string;
+  type: string;
+  area: string;
+  image: string;
+  rating?: number;
+}
+
 export default function RecommendationHistoryPage() {
   const [history, setHistory] = useState<RecommendationHistoryItem[]>([]);
+  const [places, setPlaces] = useState<HistoryPlace[]>([]);
+  const [loadingPlaces, setLoadingPlaces] = useState(true);
 
   useEffect(() => {
     const stored = localStorage.getItem(
@@ -28,6 +39,7 @@ export default function RecommendationHistoryPage() {
     );
 
     if (!stored) {
+      setLoadingPlaces(false);
       return;
     }
 
@@ -38,10 +50,50 @@ export default function RecommendationHistoryPage() {
     }
   }, []);
 
+  useEffect(() => {
+    const loadPlaces = async () => {
+      setLoadingPlaces(true);
+
+      const supabase = createClient();
+
+      const { data } = await supabase
+        .from("places")
+        .select(
+          "id, name, type, area, cover_image, photos, status",
+        )
+        .eq("status", "published")
+        .order("updated_at", {
+          ascending: false,
+        });
+
+      const mappedPlaces: HistoryPlace[] =
+        (data ?? []).map((place) => {
+          const photos = Array.isArray(place.photos)
+            ? place.photos
+            : [];
+
+          return {
+            id: place.id,
+            name: place.name,
+            type: place.type || "Place",
+            area: place.area || "Addis Ababa",
+            image:
+              place.cover_image ||
+              photos[0] ||
+              "/placeholder-place.jpg",
+          };
+        });
+
+      setPlaces(mappedPlaces);
+      setLoadingPlaces(false);
+    };
+
+    loadPlaces();
+  }, []);
+
   return (
     <main className="min-h-screen bg-black px-4 py-8 text-white sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
-
         {/* Back */}
         <Link
           href="/profile"
@@ -89,8 +141,7 @@ export default function RecommendationHistoryPage() {
               When you use MEDER IT, your recommendation sessions can
               appear here.
             </p>
-
-            <Link
+[17/09/2026 18:25] Meder.code: <Link
               href="/meder-it"
               className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#D4AF37] px-6 text-sm font-semibold text-black transition hover:bg-[#E5C158]"
             >
@@ -104,7 +155,7 @@ export default function RecommendationHistoryPage() {
         {history.length > 0 && (
           <section className="mt-10 space-y-5">
             {history.map((item) => {
-              const recommendedPlaces = mederPlaces.filter((place) =>
+              const recommendedPlaces = places.filter((place) =>
                 item.placeIds?.includes(place.id),
               );
 
@@ -126,7 +177,8 @@ export default function RecommendationHistoryPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <Compass className="h-4 w-4 text-[#D4AF37]" />
- <p className="text-sm font-medium text-white">
+
+                        <p className="text-sm font-medium text-white">
                           MEDER IT recommendation
                         </p>
                       </div>
@@ -143,61 +195,71 @@ export default function RecommendationHistoryPage() {
                     </p>
                   </div>
 
-                  {/* Recommended places */}
-                  {recommendedPlaces.length > 0 && (
-                    <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {recommendedPlaces.map((place) => (
-                        <Link
-                          key={place.id}
-                          href={`/places/${place.id}`}
-                          className="group overflow-hidden rounded-2xl border border-white/10 bg-black/30 transition hover:-translate-y-1 hover:border-[#D4AF37]/40"
-                        >
-                          <div className="relative aspect-[16/10] overflow-hidden">
-                            <img
-                              src={place.image}
-                              alt={place.name}
-                              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                            />
-
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-
-                            <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs text-white backdrop-blur-md">
-                              <Star className="h-3.5 w-3.5 fill-[#D4AF37] text-[#D4AF37]" />
-                              {place.rating}
-                            </div>
-                          </div>
-
-                          <div className="p-4">
-                            <h3 className="font-serif text-xl text-white transition group-hover:text-[#D4AF37]">
-                              {place.name}
-                            </h3>
-
-                            <p className="mt-1 text-sm text-white/40">
-                              {place.type}
-                            </p>
-
-                            <div className="mt-3 flex items-center gap-1.5 text-sm text-white/50">
-                              <MapPin className="h-4 w-4 text-[#D4AF37]" />
-                              {place.area}
-                            </div>
-                          </div>
-                        </Link>
-                      ))}
+                  {/* Loading */}
+                  {loadingPlaces && (
+                    <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/40">
+                      Loading saved recommendations...
                     </div>
                   )}
 
+                  {/* Recommended places */}
+                  {!loadingPlaces &&
+                    recommendedPlaces.length > 0 && (
+                      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {recommendedPlaces.map((place) => (
+                          <Link
+                            key={place.id}
+                            href={`/places/${place.id}`}
+                            className="group overflow-hidden rounded-2xl border border-white/10 bg-black/30 transition hover:-translate-y-1 hover:border-[#D4AF37]/40"
+                          >
+                            <div className="relative aspect-[16/10] overflow-hidden">
+                              <img
+                                src={place.image}
+                                alt={place.name}
+                                className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                              />
+
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+
+                              {place.rating !== undefined &&
+                                place.rating > 0 && (
+                                  <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs text-white backdrop-blur-md">
+                                    <Star className="h-3.5 w-3.5 fill-[#D4AF37] text-[#D4AF37]" />
+                                    {place.rating}
+                                  </div>
+                                )}
+                            </div>
+ <div className="p-4">
+                              <h3 className="font-serif text-xl text-white transition group-hover:text-[#D4AF37]">
+                                {place.name}
+                              </h3>
+
+                              <p className="mt-1 text-sm text-white/40">
+                                {place.type}
+                              </p>
+
+                              <div className="mt-3 flex items-center gap-1.5 text-sm text-white/50">
+                                <MapPin className="h-4 w-4 text-[#D4AF37]" />
+                                {place.area}
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+
                   {/* No matching places */}
-                  {recommendedPlaces.length === 0 && (
-                    <p className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/40">
-                      These recommendations are no longer available.
-                    </p>
-                  )}
+                  {!loadingPlaces &&
+                    recommendedPlaces.length === 0 && (
+                      <p className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/40">
+                        These recommendations are no longer available.
+                      </p>
+                    )}
                 </article>
               );
             })}
           </section>
         )}
-
       </div>
     </main>
   );

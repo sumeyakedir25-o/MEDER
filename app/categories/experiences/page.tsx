@@ -1,13 +1,61 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Sparkles } from "lucide-react";
-import { mederPlaces } from "@/Lib/meder/places";
+import { createClient } from "@/Lib/supabase/client";
+
+type PlaceRow = {
+  what: string[];
+  experiences: string[];
+};
 
 export default function ExperienceCategoryPage() {
+  const [places, setPlaces] = useState<PlaceRow[]>([]);
+
+  useEffect(() => {
+    async function loadPlaces() {
+      const supabase = createClient();
+
+      const { data, error } = await supabase
+        .from("places")
+        .select("experiences")
+        .eq("status", "published");
+
+      if (error) {
+        console.error("Failed to load experience categories:", error);
+        return;
+      }
+
+      setPlaces(
+        (data ?? []).map((place) => ({
+          what: Array.isArray(place.experiences)
+            ? place.experiences
+                .filter(
+                  (item): item is string =>
+                    typeof item === "string" &&
+                    (item.startsWith("Purpose:") ||
+                      item.startsWith("Experience:")),
+                )
+                .map((item) =>
+                  item.replace(/^(Purpose:|Experience:)\s*/, ""),
+                )
+            : [],
+          experiences: Array.isArray(place.experiences)
+            ? place.experiences
+            : [],
+        })),
+      );
+    }
+
+    loadPlaces();
+  }, []);
+
   const experienceCategories = Array.from(
     new Set(
-      mederPlaces.flatMap((place) => place.what || []),
+      places.flatMap((place) => place.what),
     ),
-  );
+  ).sort();
 
   return (
     <main className="min-h-screen bg-black px-4 py-8 text-white sm:px-6 lg:px-8">
@@ -36,8 +84,8 @@ export default function ExperienceCategoryPage() {
 
         <section className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {experienceCategories.map((experience) => {
-            const count = mederPlaces.filter((place) =>
-              (place.what || []).includes(experience),
+            const count = places.filter((place) =>
+              place.what.includes(experience),
             ).length;
 
             return (

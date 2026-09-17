@@ -1,13 +1,48 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Utensils } from "lucide-react";
-import { mederPlaces } from "@/Lib/meder/places";
+import { createClient } from "@/Lib/supabase/client";
+
+type PlaceRow = {
+  cuisines: string[];
+};
 
 export default function FoodCategoryPage() {
+  const [places, setPlaces] = useState<PlaceRow[]>([]);
+
+  useEffect(() => {
+    async function loadPlaces() {
+      const supabase = createClient();
+
+      const { data, error } = await supabase
+        .from("places")
+        .select("cuisines")
+        .eq("status", "published");
+
+      if (error) {
+        console.error("Failed to load food categories:", error);
+        return;
+      }
+
+      setPlaces(
+        (data ?? []).map((place) => ({
+          cuisines: Array.isArray(place.cuisines)
+            ? place.cuisines
+            : [],
+        })),
+      );
+    }
+
+    loadPlaces();
+  }, []);
+
   const foodCategories = Array.from(
     new Set(
-      mederPlaces.flatMap((place) => place.cuisine || []),
+      places.flatMap((place) => place.cuisines),
     ),
-  );
+  ).sort();
 
   return (
     <main className="min-h-screen bg-black px-4 py-8 text-white sm:px-6 lg:px-8">
@@ -36,8 +71,8 @@ export default function FoodCategoryPage() {
 
         <section className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {foodCategories.map((food) => {
-            const count = mederPlaces.filter((place) =>
-              (place.cuisine || []).includes(food),
+            const count = places.filter((place) =>
+              place.cuisines.includes(food),
             ).length;
 
             return (

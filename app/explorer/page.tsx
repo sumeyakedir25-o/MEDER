@@ -1,4 +1,4 @@
-"use client";
+ "use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -16,7 +16,7 @@ import {
   CalendarDays,
   Sparkles,
 } from "lucide-react";
-import { mederPlaces } from "@/Lib/meder/places";
+import { createClient } from "@/Lib/supabase/client";
 
 interface Experience {
   id: string;
@@ -27,40 +27,104 @@ interface Experience {
   reputationPoints?: number;
 }
 
+interface Place {
+  id: string;
+  name: string;
+  type: string;
+  area: string;
+  image: string;
+}
+
 export default function ExplorerPage() {
   const [experiences, setExperiences] = useState<Experience[]>([]);
   const [savedPlaces, setSavedPlaces] = useState<string[]>([]);
   const [spotlists, setSpotlists] = useState<unknown[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
 
   useEffect(() => {
-  const storedExperiences = JSON.parse(
-    localStorage.getItem("meder-experiences") || "[]",
-  );
+    try {
+      const storedExperiences = JSON.parse(
+        localStorage.getItem("meder-experiences") || "[]",
+      );
 
-  const storedSavedPlaces = JSON.parse(
-    localStorage.getItem("meder-saved-places") || "[]",
-  );
+      const storedSavedPlaces = JSON.parse(
+        localStorage.getItem("meder-saved-places") || "[]",
+      );
 
-  const storedSpotlists = JSON.parse(
-    localStorage.getItem("meder-spotlists") || "[]",
-  );
+      const storedSpotlists = JSON.parse(
+        localStorage.getItem("meder-spotlists") || "[]",
+      );
 
-  setExperiences(storedExperiences);
-  setSavedPlaces(storedSavedPlaces);
-  setSpotlists(storedSpotlists);
-}, []);
+      setExperiences(
+        Array.isArray(storedExperiences)
+          ? storedExperiences
+          : [],
+      );
+
+      setSavedPlaces(
+        Array.isArray(storedSavedPlaces)
+          ? storedSavedPlaces
+          : [],
+      );
+
+      setSpotlists(
+        Array.isArray(storedSpotlists)
+          ? storedSpotlists
+          : [],
+      );
+    } catch {
+      setExperiences([]);
+      setSavedPlaces([]);
+      setSpotlists([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    async function loadPlaces() {
+      const supabase = createClient();
+
+      const { data, error } = await supabase
+        .from("places")
+        .select("id, name, type, area, cover_image, photos")
+        .eq("status", "published");
+
+      if (error) {
+        console.error("Failed to load Explorer places:", error);
+        setPlaces([]);
+        return;
+      }
+
+      setPlaces(
+        (data ?? []).map((place) => ({
+          id: place.id,
+          name: place.name,
+          type: place.type || "Place",
+          area: place.area || "Unknown area",
+          image:
+            place.cover_image ||
+            (Array.isArray(place.photos) && place.photos.length > 0
+              ? place.photos[0]
+              : ""),
+        })),
+      );
+    }
+
+    loadPlaces();
+  }, []);
+
   const experiencedPlaceIds = new Set(
     experiences.map((experience) => experience.placeId),
   );
 
-  const experiencedPlaces = mederPlaces.filter((place) =>
+  const experiencedPlaces = places.filter((place) =>
     experiencedPlaceIds.has(place.id),
   );
+
   const totalReputation = experiences.reduce(
-  (total, experience) =>
-    total + (experience.reputationPoints || 0),
-  0,
-);
+    (total, experience) =>
+      total + (experience.reputationPoints || 0),
+    0,
+  );
 
   return (
     <main className="min-h-screen bg-black px-4 py-8 text-white sm:px-6 lg:px-8">
@@ -80,8 +144,7 @@ export default function ExplorerPage() {
               <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10">
                 <Compass className="h-10 w-10 text-[#D4AF37]" />
               </div>
-
-              <div className="flex-1">
+ <div className="flex-1">
                 <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#D4AF37]">
                   MEDER Explorer
                 </p>
@@ -92,9 +155,9 @@ export default function ExplorerPage() {
 
                 <div className="mt-4 flex flex-wrap gap-3">
                   <span className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-3 py-1.5 text-xs text-[#D4AF37]">
-  <Sparkles className="h-3.5 w-3.5" />
-  Explorer
-</span>
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Explorer
+                  </span>
 
                   <span className="inline-flex items-center gap-2 text-xs text-white/40">
                     <CalendarDays className="h-3.5 w-3.5" />
@@ -137,6 +200,7 @@ export default function ExplorerPage() {
                   </div>
                 </div>
               </div>
+
               <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
                 <div className="flex items-center gap-3">
                   <Bookmark className="h-5 w-5 text-[#D4AF37]" />
@@ -155,24 +219,26 @@ export default function ExplorerPage() {
             </div>
           </div>
         </section>
+
         <ExperiencedPlaces />
 
-<SavedPlaces />
+        <SavedPlaces />
 
-<ExplorerLevel
-  contributions={experiences.length}
-  experiencedPlaces={experiencedPlaces.length}
-  savedPlaces={savedPlaces.length}
-  reputation={totalReputation}
-/>
+        <ExplorerLevel
+          contributions={experiences.length}
+          experiencedPlaces={experiencedPlaces.length}
+          savedPlaces={savedPlaces.length}
+          reputation={totalReputation}
+        />
 
-<ExplorerBadges
-  contributions={experiences.length}
-  experiencedPlaces={experiencedPlaces.length}
-  savedPlaces={savedPlaces.length}
-  spotlists={spotlists.length}
-/>
-<LogoutButton />
+        <ExplorerBadges
+          contributions={experiences.length}
+          experiencedPlaces={experiencedPlaces.length}
+          savedPlaces={savedPlaces.length}
+          spotlists={spotlists.length}
+        />
+
+        <LogoutButton />
 
         {/* Explorer sections */}
         <section className="mt-8 grid gap-4 md:grid-cols-2">
@@ -195,8 +261,7 @@ export default function ExplorerPage() {
               View contributions →
             </p>
           </Link>
-
-          <Link
+ <Link
             href="/explorer/places"
             className="group rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-[#D4AF37]/40 hover:bg-[#D4AF37]/5"
           >

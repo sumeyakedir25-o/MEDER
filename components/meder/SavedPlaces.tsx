@@ -1,24 +1,106 @@
-"use client";
+ "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { Bookmark, MapPin, Star } from "lucide-react";
-import { mederPlaces } from "@/Lib/meder/places";
+import { useEffect, useState } from "react";
+import { createClient } from "@/Lib/supabase/client";
+
+interface SavedPlace {
+  id: string;
+  name: string;
+  type: string;
+  area: string;
+  image: string;
+  vibe: string[];
+  rating?: number;
+}
 
 export default function SavedPlaces() {
   const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const saved = JSON.parse(
-      localStorage.getItem("meder-saved-places") || "[]",
+    const stored = localStorage.getItem(
+      "meder-saved-places",
     );
 
-    setSavedIds(saved);
+    try {
+      setSavedIds(stored ? JSON.parse(stored) : []);
+    } catch {
+      setSavedIds([]);
+    }
   }, []);
 
-  const savedPlaces = mederPlaces.filter((place) =>
-    savedIds.includes(place.id),
-  );
+  useEffect(() => {
+    const loadSavedPlaces = async () => {
+      if (savedIds.length === 0) {
+        setSavedPlaces([]);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+
+      const supabase = createClient();
+
+      const { data } = await supabase
+        .from("places")
+        .select(
+          "id, name, type, area, cover_image, photos, experiences, practical_data, status",
+        )
+        .eq("status", "published")
+        .in("id", savedIds);
+
+      const mappedPlaces: SavedPlace[] =
+        (data ?? []).map((place) => {
+          const photos = Array.isArray(place.photos)
+            ? place.photos
+            : [];
+
+          const experiences = Array.isArray(
+            place.experiences,
+          )
+            ? place.experiences
+            : [];
+
+          const vibes = experiences
+            .filter(
+              (item): item is string =>
+                typeof item === "string" &&
+                item.startsWith("Vibe:"),
+            )
+            .map((item) =>
+              item.replace("Vibe:", "").trim(),
+            );
+
+          return {
+            id: place.id,
+            name: place.name,
+            type: place.type || "Place",
+            area: place.area || "Addis Ababa",
+            image:
+              place.cover_image ||
+              photos[0] ||
+              "/placeholder-place.jpg",
+            vibe: vibes,
+          };
+        });
+
+      const orderedPlaces = savedIds
+        .map((id) =>
+          mappedPlaces.find((place) => place.id === id),
+        )
+        .filter(
+          (place): place is SavedPlace => place !== undefined,
+        );
+
+      setSavedPlaces(orderedPlaces);
+      setLoading(false);
+    };
+
+    loadSavedPlaces();
+  }, [savedIds]);
 
   return (
     <section className="mt-10 border-t border-white/10 pt-8">
@@ -43,7 +125,17 @@ export default function SavedPlaces() {
         </div>
       </div>
 
-      {savedPlaces.length === 0 ? (
+      {loading ? (
+        <div className="mt-6 rounded-3xl border border-dashed border-white/15 bg-white/[0.02] px-6 py-12 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#D4AF37]/10">
+            <Bookmark className="h-5 w-5 text-[#D4AF37]" />
+          </div>
+
+          <p className="mt-4 text-sm text-white/40">
+            Loading your saved places...
+          </p>
+        </div>
+ ) : savedPlaces.length === 0 ? (
         <div className="mt-6 rounded-3xl border border-dashed border-white/15 bg-white/[0.02] px-6 py-12 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#D4AF37]/10">
             <Bookmark className="h-5 w-5 text-[#D4AF37]" />
@@ -85,10 +177,13 @@ export default function SavedPlaces() {
                   <Bookmark className="h-4 w-4 fill-current" />
                 </div>
 
-                <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs text-white backdrop-blur-md">
-                  <Star className="h-3.5 w-3.5 fill-[#D4AF37] text-[#D4AF37]" />
-                  {place.rating}
-                </div>
+                {place.rating !== undefined &&
+                  place.rating > 0 && (
+                    <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs text-white backdrop-blur-md">
+                      <Star className="h-3.5 w-3.5 fill-[#D4AF37] text-[#D4AF37]" />
+                      {place.rating}
+                    </div>
+                  )}
               </div>
 
               <div className="p-4">
@@ -99,21 +194,24 @@ export default function SavedPlaces() {
                 <p className="mt-1 text-sm text-white/45">
                   {place.type}
                 </p>
+
                 <div className="mt-3 flex items-center gap-1.5 text-sm text-white/55">
                   <MapPin className="h-4 w-4 text-[#D4AF37]" />
                   {place.area}
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {place.vibe.slice(0, 3).map((vibe) => (
-                    <span
-                      key={vibe}
-                      className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[10px] text-white/50"
-                    >
-                      {vibe}
-                    </span>
-                  ))}
-                </div>
+                {place.vibe.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-1.5">
+                    {place.vibe.slice(0, 3).map((vibe) => (
+                      <span
+                        key={vibe}
+                        className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[10px] text-white/50"
+                      >
+                        {vibe}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </Link>
           ))}

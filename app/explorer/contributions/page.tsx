@@ -12,7 +12,7 @@ import {
   ExternalLink,
   MessageCircle,
 } from "lucide-react";
-import { mederPlaces } from "@/Lib/meder/places";
+import { createClient } from "@/Lib/supabase/client";
 
 interface MediaItem {
   type: "image" | "video";
@@ -29,16 +29,72 @@ interface Experience {
   createdAt: string;
 }
 
+interface Place {
+  id: string;
+  name: string;
+  area: string;
+  image: string;
+}
+
 export default function ContributionsPage() {
   const [experiences, setExperiences] = useState<Experience[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
 
   useEffect(() => {
-    const storedExperiences = JSON.parse(
-      localStorage.getItem("meder-experiences") || "[]",
-    );
+    try {
+      const storedExperiences = JSON.parse(
+        localStorage.getItem("meder-experiences") || "[]",
+      );
 
-    setExperiences(storedExperiences);
+      setExperiences(
+        Array.isArray(storedExperiences) ? storedExperiences : [],
+      );
+    } catch {
+      setExperiences([]);
+    }
   }, []);
+
+  useEffect(() => {
+    async function loadPlaces() {
+      if (experiences.length === 0) {
+        setPlaces([]);
+        return;
+      }
+
+      const placeIds = Array.from(
+        new Set(experiences.map((experience) => experience.placeId)),
+      );
+
+      const supabase = createClient();
+
+      const { data, error } = await supabase
+        .from("places")
+        .select("id, name, area, cover_image, photos")
+        .eq("status", "published")
+        .in("id", placeIds);
+
+      if (error) {
+        console.error("Failed to load contribution places:", error);
+        setPlaces([]);
+        return;
+      }
+
+      setPlaces(
+        (data ?? []).map((place) => ({
+          id: place.id,
+          name: place.name,
+          area: place.area || "Unknown area",
+          image:
+            place.cover_image ||
+            (Array.isArray(place.photos) && place.photos.length > 0
+              ? place.photos[0]
+              : ""),
+        })),
+      );
+    }
+
+    loadPlaces();
+  }, [experiences]);
 
   const sortedExperiences = useMemo(() => {
     return [...experiences].sort((a, b) => {
@@ -48,6 +104,10 @@ export default function ContributionsPage() {
       return bTime - aTime;
     });
   }, [experiences]);
+
+  const placeById = useMemo(() => {
+    return new Map(places.map((place) => [place.id, place]));
+  }, [places]);
 
   return (
     <main className="min-h-screen bg-black px-4 py-8 text-white sm:px-6 lg:px-8">
@@ -86,14 +146,11 @@ export default function ContributionsPage() {
             </div>
           </div>
         </section>
-
-        {/* Contributions */}
+ {/* Contributions */}
         {sortedExperiences.length > 0 ? (
           <section className="mt-8 space-y-5">
             {sortedExperiences.map((experience) => {
-              const place = mederPlaces.find(
-                (item) => item.id === experience.placeId,
-              );
+              const place = placeById.get(experience.placeId);
 
               const imageCount =
                 experience.media?.filter(
@@ -113,14 +170,19 @@ export default function ContributionsPage() {
                   <div className="flex flex-col md:flex-row">
                     {/* Place image */}
                     <div className="relative h-48 w-full shrink-0 md:h-auto md:w-56">
-                      <img
-                        src={place?.image}
-                        alt={place?.name || "Place"}
-                        className="h-full w-full object-cover"
-                      />
+                      {place?.image ? (
+                        <img
+                          src={place.image}
+                          alt={place.name || "Place"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full bg-white/[0.03]" />
+                      )}
 
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
- <div className="absolute bottom-3 left-3 flex items-center gap-2 text-xs text-white">
+
+                      <div className="absolute bottom-3 left-3 flex items-center gap-2 text-xs text-white">
                         <MapPin className="h-3.5 w-3.5 text-[#D4AF37]" />
                         {place?.area || "Unknown area"}
                       </div>
@@ -169,7 +231,7 @@ export default function ContributionsPage() {
                         <div className="mt-5 flex flex-wrap gap-2">
                           {experience.tags.map((tag) => (
                             <span
-                              key={tag}
+ key={tag}
                               className="rounded-full border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-3 py-1.5 text-xs text-[#D4AF37]"
                             >
                               {tag}
@@ -196,18 +258,15 @@ export default function ContributionsPage() {
                             <span className="inline-flex items-center gap-2 text-xs text-white/45">
                               <ImageIcon className="h-4 w-4 text-[#D4AF37]" />
                               {imageCount}{" "}
-                              {imageCount === 1
-                                ? "photo"
-                                : "photos"}
+                              {imageCount === 1 ? "photo" : "photos"}
                             </span>
                           )}
- {videoCount > 0 && (
+
+                          {videoCount > 0 && (
                             <span className="inline-flex items-center gap-2 text-xs text-white/45">
                               <Video className="h-4 w-4 text-[#D4AF37]" />
                               {videoCount}{" "}
-                              {videoCount === 1
-                                ? "video"
-                                : "videos"}
+                              {videoCount === 1 ? "video" : "videos"}
                             </span>
                           )}
                         </div>

@@ -8,12 +8,11 @@ import {
 } from "react-leaflet";
 import { Icon } from "leaflet";
 import Link from "next/link";
-import type { MederPlace } from "@/Lib/meder/matching";
-
+import type { MapPlace } from "@/app/map/page";
 import "leaflet/dist/leaflet.css";
 
 interface LeafletMapProps {
-  places: MederPlace[];
+  places: MapPlace[];
 }
 
 const markerIcon = new Icon({
@@ -46,16 +45,23 @@ export default function LeafletMap({
         {places.map((place) => (
           <Marker
             key={place.id}
-            position={[place.latitude, place.longitude]}
+            position={[
+              place.latitude,
+              place.longitude,
+            ]}
             icon={markerIcon}
           >
             <Popup>
               <div className="min-w-[180px]">
-                <img
-                  src={place.image}
-                  alt={place.name}
-                  className="h-24 w-full rounded-lg object-cover"
-                />
+                {place.image ? (
+                  <img
+                    src={place.image}
+                    alt={place.name}
+                    className="h-24 w-full rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="h-24 w-full rounded-lg bg-gray-100" />
+                )}
 
                 <h3 className="mt-3 text-base font-semibold">
                   {place.name}
@@ -65,9 +71,17 @@ export default function LeafletMap({
                   {place.type}
                 </p>
 
-                <p className="mt-2 text-sm">
-                  ⭐ {place.rating}
-                </p>
+                {place.area && (
+                  <p className="mt-1 text-sm text-gray-500">
+                    {place.area}
+                  </p>
+                )}
+
+                {place.rating > 0 && (
+                  <p className="mt-2 text-sm">
+                    ⭐ {place.rating}
+                  </p>
+                )}
 
                 <Link
                   href={`/places/${place.id}`}

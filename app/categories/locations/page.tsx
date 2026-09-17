@@ -1,11 +1,46 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ArrowLeft, MapPin } from "lucide-react";
-import { mederPlaces } from "@/Lib/meder/places";
+import { createClient } from "@/Lib/supabase/client";
+
+type PlaceRow = {
+  area: string;
+};
 
 export default function LocationCategoryPage() {
+  const [places, setPlaces] = useState<PlaceRow[]>([]);
+
+  useEffect(() => {
+    async function loadPlaces() {
+      const supabase = createClient();
+
+      const { data, error } = await supabase
+        .from("places")
+        .select("area")
+        .eq("status", "published");
+
+      if (error) {
+        console.error("Failed to load locations:", error);
+        return;
+      }
+
+      setPlaces(
+        (data ?? [])
+          .map((place) => ({
+            area: place.area || "",
+          }))
+          .filter((place) => place.area.trim() !== ""),
+      );
+    }
+
+    loadPlaces();
+  }, []);
+
   const locations = Array.from(
-    new Set(mederPlaces.map((place) => place.area)),
-  );
+    new Set(places.map((place) => place.area)),
+  ).sort();
 
   return (
     <main className="min-h-screen bg-black px-4 py-8 text-white sm:px-6 lg:px-8">
@@ -34,7 +69,7 @@ export default function LocationCategoryPage() {
 
         <section className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {locations.map((location) => {
-            const count = mederPlaces.filter(
+            const count = places.filter(
               (place) => place.area === location,
             ).length;
 

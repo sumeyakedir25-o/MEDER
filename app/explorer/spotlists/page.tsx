@@ -11,7 +11,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { mederPlaces } from "@/Lib/meder/places";
+import { createClient } from "@/Lib/supabase/client";
 
 interface Spotlist {
   id: string;
@@ -21,20 +21,68 @@ interface Spotlist {
   createdAt: string;
 }
 
+interface Place {
+  id: string;
+  name: string;
+  type: string;
+  area: string;
+  image: string;
+}
+
 export default function SpotlistsPage() {
   const [spotlists, setSpotlists] = useState<Spotlist[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
-
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedPlaces, setSelectedPlaces] = useState<string[]>([]);
 
   useEffect(() => {
-    const storedSpotlists = JSON.parse(
-      localStorage.getItem("meder-spotlists") || "[]",
-    );
+    try {
+      const storedSpotlists = JSON.parse(
+        localStorage.getItem("meder-spotlists") || "[]",
+      );
 
-    setSpotlists(storedSpotlists);
+      setSpotlists(
+        Array.isArray(storedSpotlists) ? storedSpotlists : [],
+      );
+    } catch {
+      setSpotlists([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    async function loadPlaces() {
+      const supabase = createClient();
+
+      const { data, error } = await supabase
+        .from("places")
+        .select("id, name, type, area, cover_image, photos")
+        .eq("status", "published")
+        .order("updated_at", { ascending: false });
+
+      if (error) {
+        console.error("Failed to load spotlist places:", error);
+        setPlaces([]);
+        return;
+      }
+
+      setPlaces(
+        (data ?? []).map((place) => ({
+          id: place.id,
+          name: place.name,
+          type: place.type || "Place",
+          area: place.area || "Unknown area",
+          image:
+            place.cover_image ||
+            (Array.isArray(place.photos) && place.photos.length > 0
+              ? place.photos[0]
+              : ""),
+        })),
+      );
+    }
+
+    loadPlaces();
   }, []);
 
   const togglePlace = (placeId: string) => {
@@ -71,7 +119,6 @@ export default function SpotlistsPage() {
     );
 
     setSpotlists(updatedSpotlists);
-
     closeCreateForm();
   };
 
@@ -109,8 +156,7 @@ export default function SpotlistsPage() {
             <h1 className="mt-3 font-serif text-3xl text-white sm:text-5xl">
               Spotlists
             </h1>
-
-            <p className="mt-3 max-w-xl text-sm leading-6 text-white/45 sm:text-base">
+[17/09/2026 18:14] Meder.code: <p className="mt-3 max-w-xl text-sm leading-6 text-white/45 sm:text-base">
               Create collections of places for your moods, plans,
               people, and future adventures.
             </p>
@@ -130,14 +176,14 @@ export default function SpotlistsPage() {
         {spotlists.length > 0 ? (
           <section className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {spotlists.map((spotlist) => {
-              const places = mederPlaces.filter((place) =>
+              const spotlistPlaces = places.filter((place) =>
                 spotlist.placeIds.includes(place.id),
               );
 
               return (
                 <article
                   key={spotlist.id}
- className="group overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] transition hover:border-[#D4AF37]/40"
+                  className="group overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] transition hover:border-[#D4AF37]/40"
                 >
                   <div className="relative p-6">
                     <div className="flex items-start justify-between gap-4">
@@ -167,33 +213,36 @@ export default function SpotlistsPage() {
 
                     <div className="mt-6 flex items-center gap-2 text-xs text-white/40">
                       <MapPin className="h-4 w-4 text-[#D4AF37]" />
-
-                      {places.length}{" "}
-                      {places.length === 1 ? "place" : "places"}
+                      {spotlistPlaces.length}{" "}
+                      {spotlistPlaces.length === 1 ? "place" : "places"}
                     </div>
                   </div>
 
-                  {places.length > 0 && (
+                  {spotlistPlaces.length > 0 && (
                     <div className="grid grid-cols-3 gap-px bg-white/10">
-                      {places.slice(0, 3).map((place) => (
+                      {spotlistPlaces.slice(0, 3).map((place) => (
                         <Link
                           key={place.id}
                           href={`/places/${place.id}`}
                           className="aspect-square overflow-hidden bg-black"
                         >
-                          <img
-                            src={place.image}
-                            alt={place.name}
-                            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                          />
+                          {place.image ? (
+                            <img
+                              src={place.image}
+                              alt={place.name}
+                              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="h-full w-full bg-white/[0.03]" />
+                          )}
                         </Link>
                       ))}
                     </div>
                   )}
 
-                  {places.length === 0 && (
+                  {spotlistPlaces.length === 0 && (
                     <div className="flex min-h-28 items-center justify-center border-t border-white/10 bg-black/20 text-xs text-white/30">
-                      No places added yet
+ No places added yet
                     </div>
                   )}
                 </article>
@@ -225,7 +274,8 @@ export default function SpotlistsPage() {
             </button>
           </section>
         )}
- {/* Create modal */}
+
+        {/* Create modal */}
         {showCreateForm && (
           <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 px-4 py-6 backdrop-blur-sm">
             <div className="flex min-h-full items-center justify-center">
@@ -286,8 +336,7 @@ export default function SpotlistsPage() {
                     className="mt-3 w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#D4AF37]/50"
                   />
                 </div>
-
-                <div className="mt-7">
+ <div className="mt-7">
                   <div className="flex items-center justify-between gap-4">
                     <label className="text-xs font-medium uppercase tracking-[0.15em] text-white/40">
                       Add places
@@ -299,7 +348,7 @@ export default function SpotlistsPage() {
                   </div>
 
                   <div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
-                    {mederPlaces.map((place) => {
+                    {places.map((place) => {
                       const selected = selectedPlaces.includes(
                         place.id,
                       );
@@ -310,16 +359,20 @@ export default function SpotlistsPage() {
                           type="button"
                           onClick={() => togglePlace(place.id)}
                           className={`flex w-full items-center gap-4 rounded-2xl border p-3 text-left transition ${
- selected
+                            selected
                               ? "border-[#D4AF37]/50 bg-[#D4AF37]/10"
                               : "border-white/10 bg-white/[0.02] hover:border-white/20"
                           }`}
                         >
-                          <img
-                            src={place.image}
-                            alt={place.name}
-                            className="h-14 w-14 shrink-0 rounded-xl object-cover"
-                          />
+                          {place.image ? (
+                            <img
+                              src={place.image}
+                              alt={place.name}
+                              className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                            />
+                          ) : (
+                            <div className="h-14 w-14 shrink-0 rounded-xl bg-white/[0.04]" />
+                          )}
 
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-white">

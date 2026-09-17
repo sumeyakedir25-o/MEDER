@@ -20,7 +20,6 @@ import {
   X,
   CheckCircle2,
 } from "lucide-react";
-import { mederPlaces } from "@/Lib/meder/places";
 import { createClient } from "@/Lib/supabase/client";
 
 type PlaceMedia = {
@@ -61,6 +60,197 @@ type OpeningHour = {
   closed?: boolean;
 };
 
+type RelatedPlace = {
+  id: string;
+  name: string;
+  type: string;
+  area: string;
+  image: string;
+  rating: number;
+  reviews: number;
+  cuisine: string[];
+  experiences: string[];
+  vibe: string[];
+  budget: string[];
+};
+
+function normalizeValue(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function hasOverlap(
+  first: string[],
+  second: string[]
+) {
+  const normalizedFirst = first.map(normalizeValue);
+  const normalizedSecond = second.map(normalizeValue);
+
+  return normalizedFirst.some((value) =>
+    normalizedSecond.includes(value)
+  );
+}
+
+function calculateRelatedScore(
+  current: RelatedPlace,
+  candidate: RelatedPlace
+) {
+  let score = 0;
+
+  if (
+    current.area &&
+    candidate.area &&
+    normalizeValue(current.area) ===
+      normalizeValue(candidate.area)
+  ) {
+    score += 30;
+  }
+
+  if (
+    current.type &&
+    candidate.type &&
+    normalizeValue(current.type) ===
+      normalizeValue(candidate.type)
+  ) {
+    score += 25;
+  }
+
+  if (
+    current.cuisine.length > 0 &&
+    candidate.cuisine.length > 0 &&
+    hasOverlap(current.cuisine, candidate.cuisine)
+  ) {
+    score += 15;
+  }
+
+  if (
+    current.experiences.length > 0 &&
+    candidate.experiences.length > 0 &&
+    hasOverlap(current.experiences, candidate.experiences)
+  ) {
+    score += 15;
+  }
+
+  if (
+    current.vibe.length > 0 &&
+    candidate.vibe.length > 0 &&
+    hasOverlap(current.vibe, candidate.vibe)
+  ) {
+    score += 10;
+  }
+
+  if (
+    current.budget.length > 0 &&
+    candidate.budget.length > 0 &&
+    hasOverlap(current.budget, candidate.budget)
+  ) {
+    score += 5;
+  }
+
+  return score;
+}
+
+function getRelatedPlaceData(data: any): RelatedPlace {
+  const practical = data.practical_data || {};
+  const experiences = Array.isArray(data.experiences)
+    ? data.experiences
+    : [];
+
+  const experienceTags = experiences
+    .filter((item: string) =>
+      item.startsWith("Experience:")
+    )
+    .map((item: string) =>
+      item.replace("Experience:", "").trim()
+    );
+
+  const purposeTags = experiences
+    .filter((item: string) =>
+      item.startsWith("Purpose:")
+    )
+    .map((item: string) =>
+      item.replace("Purpose:", "").trim()
+    );
+
+  const vibeTags = experiences
+    .filter((item: string) =>
+      item.startsWith("Vibe:")
+    )
+    .map((item: string) =>
+      item.replace("Vibe:", "").trim()
+    );
+
+  const budget: string[] = [];
+
+  const spendMin = Number(practical.spend_min || 0);
+  const spendMax = Number(practical.spend_max || 0);
+  const priceLevel = Number(data.price_level || 0);
+
+  if (spendMin || spendMax) {
+    if (spendMin < 500 || (spendMax > 0 && spendMax <= 500)) {
+      budget.push("Under 500 ETB");
+    }
+
+    if (
+      (spendMin <= 1000 && spendMax >= 500) ||
+      (spendMin >= 500 && spendMin <= 1000)
+    ) {
+      budget.push("500–1,000 ETB");
+    }
+
+    if (
+      (spendMin <= 2000 && spendMax >= 1000) ||
+      (spendMin >= 1000 && spendMin <= 2000)
+    ) {
+      budget.push("1,000–2,000 ETB");
+    }
+
+    if (spendMax >= 2000 || spendMin >= 2000) {
+      budget.push("2,000+ ETB");
+    }
+  } else {
+    if (priceLevel === 1) {
+      budget.push("Under 500 ETB");
+    }
+
+    if (priceLevel === 2) {
+      budget.push("500–1,000 ETB");
+    }
+
+    if (priceLevel === 3) {
+      budget.push("1,000–2,000 ETB");
+    }
+
+    if (priceLevel === 4) {
+      budget.push("2,000+ ETB");
+    }
+  }
+
+  return {
+    id: data.id,
+    name: data.name || "Unnamed place",
+    type: data.type || "data.category",
+    area: data.area || "",
+    image:
+      data.cover_image ||
+      data.photos?.[0] ||
+      "",
+    rating: Number(data.rating || 0),
+    reviews: Number(data.reviews || 0),
+    cuisine: Array.isArray(data.cuisines)
+      ? data.cuisines
+      : [],
+    experiences: [
+      ...purposeTags,
+      ...experienceTags,
+    ],
+    vibe: vibeTags,
+    budget,
+  };
+}
+
 export default function PlaceDetailsPage() {
   const params = useParams();
   const id = params.id as string;
@@ -88,6 +278,10 @@ const openingHours = place?.openingHours ?? [];
 
   const [media, setMedia] = useState<PlaceMedia[]>([]);
   const [mediaLoading, setMediaLoading] = useState(true);
+  const [relatedPlaces, setRelatedPlaces] = useState<
+  RelatedPlace[]
+>([]);
+const [relatedLoading, setRelatedLoading] = useState(true);
 
   /*
    * Load MEDER media from Supabase.
@@ -218,6 +412,74 @@ const openingHours = place?.openingHours ?? [];
 
     loadMedia();
   }, [place]);
+
+  useEffect(() => {
+  async function loadRelatedPlaces() {
+    if (!place) {
+      setRelatedPlaces([]);
+      setRelatedLoading(false);
+      return;
+    }
+
+    setRelatedLoading(true);
+
+    const { data, error } = await supabase
+      .from("places")
+      .select(
+        "id, name, type, category, area, cuisines, experiences, price_level, practical_data, cover_image, photos, rating, reviews"
+      )
+      .eq("status", "published")
+      .neq("id", place.id);
+
+    if (error) {
+      console.error(
+        "Failed to load related places:",
+        error
+      );
+      setRelatedPlaces([]);
+      setRelatedLoading(false);
+      return;
+    }
+
+    const currentPlace = getRelatedPlaceData(place);
+
+    const scoredPlaces = (data || [])
+      .map((item: any) => {
+        const candidate = getRelatedPlaceData(item);
+
+        return {
+          place: candidate,
+          score: calculateRelatedScore(
+            currentPlace,
+            candidate
+          ),
+        };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+
+        if (b.place.rating !== a.place.rating) {
+          return b.place.rating - a.place.rating;
+        }
+
+        return b.place.name.localeCompare(
+          a.place.name
+        );
+      })
+      .slice(0, 3);
+
+    setRelatedPlaces(
+      scoredPlaces.map((item) => item.place)
+    );
+
+    setRelatedLoading(false);
+  }
+
+  loadRelatedPlaces();
+}, [place]);
 
   /*
    * Current time
@@ -377,29 +639,7 @@ const openingHours = place?.openingHours ?? [];
               </div>
             </section>
 
-  /*
-   * Related places
-   */
-  const relatedPlaces = mederPlaces
-    .filter((item) => item.id !== place?.id)
-    .sort((a, b) => {
-      const aScore =
-        a.type === place?.type
-          ? 2
-          : a.area === place?.area
-            ? 1
-            : 0;
-
-      const bScore =
-        b.type === place?.type
-          ? 2
-          : b.area === place?.area
-            ? 1
-            : 0;
-
-      return bScore - aScore;
-    })
-    .slice(0, 3);
+  
 
   /*
    * Place not found

@@ -1,10 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { MederPlace } from "@/Lib/meder/matching";
+import type { MapPlace } from "@/app/map/page";
 
 interface MederMapProps {
-  places: MederPlace[];
+  places: MapPlace[];
 }
 
 const LeafletMap = dynamic(
@@ -12,13 +12,15 @@ const LeafletMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-[500px] w-full rounded-2xl border border-white/10 flex items-center justify-center">
+      <div className="flex h-[500px] w-full items-center justify-center rounded-2xl border border-white/10">
         Loading map...
       </div>
     ),
-  }
+  },
 );
 
-export default function MederMap({ places }: MederMapProps) {
+export default function MederMap({
+  places,
+}: MederMapProps) {
   return <LeafletMap places={places} />;
 }

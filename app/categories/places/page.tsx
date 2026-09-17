@@ -1,6 +1,15 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowLeft, MapPin, Utensils, Coffee, Sparkles } from "lucide-react";
-import { mederPlaces } from "@/Lib/meder/places";
+import { useEffect, useState } from "react";
+import {
+  ArrowLeft,
+  MapPin,
+  Utensils,
+  Coffee,
+  Sparkles,
+} from "lucide-react";
+import { createClient } from "@/Lib/supabase/client";
 
 const typeIcons: Record<string, typeof Utensils> = {
   Restaurant: Utensils,
@@ -10,10 +19,42 @@ const typeIcons: Record<string, typeof Utensils> = {
   "Rooftop Lounge": Sparkles,
 };
 
+type PlaceRow = {
+  type: string;
+};
+
 export default function PlacesCategoryPage() {
+  const [places, setPlaces] = useState<PlaceRow[]>([]);
+
+  useEffect(() => {
+    async function loadPlaces() {
+      const supabase = createClient();
+
+      const { data, error } = await supabase
+        .from("places")
+        .select("type")
+        .eq("status", "published");
+
+      if (error) {
+        console.error("Failed to load place types:", error);
+        return;
+      }
+
+      setPlaces(
+        (data ?? [])
+          .map((place) => ({
+            type: place.type || "",
+          }))
+          .filter((place) => place.type.trim() !== ""),
+      );
+    }
+
+    loadPlaces();
+  }, []);
+
   const placeTypes = Array.from(
-    new Set(mederPlaces.map((place) => place.type)),
-  );
+    new Set(places.map((place) => place.type)),
+  ).sort();
 
   return (
     <main className="min-h-screen bg-black px-4 py-8 text-white sm:px-6 lg:px-8">
@@ -44,7 +85,7 @@ export default function PlacesCategoryPage() {
           {placeTypes.map((type) => {
             const Icon = typeIcons[type] ?? MapPin;
 
-            const count = mederPlaces.filter(
+            const count = places.filter(
               (place) => place.type === type,
             ).length;
 
