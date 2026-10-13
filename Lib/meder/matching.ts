@@ -36,6 +36,7 @@ export type MederPlace = {
 latitude: number;
 longitude: number;
 distance?: string;
+distanceKm?: number;
 travelTime?: string;
 address?: string;
 
@@ -117,6 +118,60 @@ const weights = {
   budget: 15,
   time: 10,
 };
+
+function getLocationMatch(
+  selected: string[] | undefined,
+  place: MederPlace,
+): number {
+  if (!selected || selected.length === 0) {
+    return 0;
+  }
+
+  if (selected.includes("Near Me")) {
+    if (place.distanceKm === undefined) {
+      return place.location.includes("Near Me") ? 1 : 0;
+    }
+
+    if (place.distanceKm <= 1) {
+      return 1;
+    }
+
+    if (place.distanceKm <= 3) {
+      return 0.8;
+    }
+
+    if (place.distanceKm <= 5) {
+      return 0.6;
+    }
+
+    return 0;
+  }
+
+  return getMatches(selected, place.location);
+}
+
+function getBudgetMatch(
+  selected: string[] | undefined,
+  available: string[],
+): number {
+  if (!selected || selected.length === 0) {
+    return 0;
+  }
+
+  if (available.length === 0) {
+    return 0;
+  }
+
+  const matches = selected.filter((value) =>
+    available.includes(value),
+  );
+
+  if (matches.length === 0) {
+    return 0;
+  }
+
+  return matches.length / selected.length;
+}
 
 function getMatches(
   selected: string[] | undefined,
@@ -206,10 +261,21 @@ export function calculateMatch(
       continue;
     }
 
-    const match = getMatches(
-      dimension.selected,
-      dimension.available,
-    );
+    const match =
+  dimension.key === "location"
+    ? getLocationMatch(
+        dimension.selected,
+        place,
+      )
+    : dimension.key === "budget"
+      ? getBudgetMatch(
+          dimension.selected,
+          dimension.available,
+        )
+      : getMatches(
+          dimension.selected,
+          dimension.available,
+        );
 
     totalScore += match * dimension.weight;
     usedWeight += dimension.weight;
@@ -233,13 +299,56 @@ export function calculateMatch(
     reasons: reasons.slice(0, 4),
   };
 }
+function isCandidate(
+  selections: MederSelections,
+  place: MederPlace,
+): boolean {
+  // If the user selected a purpose, the place should
+  // support at least one of those purposes.
+  if (
+    selections.what &&
+    selections.what.length > 0 &&
+    place.what.length > 0
+  ) {
+    const hasPurposeMatch = selections.what.some(
+      (value) => place.what.includes(value),
+    );
 
+    if (!hasPurposeMatch) {
+      return false;
+    }
+  }
+
+  // If the user selected a budget and the place has
+  // known budget data, require at least one overlap.
+  // Places with missing budget data are NOT rejected.
+  if (
+    selections.budget &&
+    selections.budget.length > 0 &&
+    place.budget.length > 0
+  ) {
+    const hasBudgetMatch = selections.budget.some(
+      (value) => place.budget.includes(value),
+    );
+
+    if (!hasBudgetMatch) {
+      return false;
+    }
+  }
+
+  return true;
+}
 export function getRecommendations(
   selections: MederSelections,
   places: MederPlace[],
 ): MatchResult[] {
   return places
-    .map((place) => calculateMatch(selections, place))
+    .filter((place) =>
+      isCandidate(selections, place),
+    )
+    .map((place) =>
+      calculateMatch(selections, place),
+    )
     .filter((result) => result.score > 0)
     .sort((a, b) => {
       if (b.score !== a.score) {

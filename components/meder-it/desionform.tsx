@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { trackEvent } from "@/Lib/analytics";
 import {
   Users,
   Utensils,
@@ -127,6 +128,12 @@ export default function DecisionForm() {
   }
 
   sessionStorage.setItem("meder-decision", JSON.stringify(selections));
+  void trackEvent({
+  eventName: "meder_it_completed",
+  metadata: {
+    selections,
+  },
+});
 
   router.push("/meder-it/result");
 }

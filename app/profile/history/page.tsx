@@ -141,7 +141,7 @@ export default function RecommendationHistoryPage() {
               When you use MEDER IT, your recommendation sessions can
               appear here.
             </p>
-[17/09/2026 18:25] Meder.code: <Link
+ <Link
               href="/meder-it"
               className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#D4AF37] px-6 text-sm font-semibold text-black transition hover:bg-[#E5C158]"
             >

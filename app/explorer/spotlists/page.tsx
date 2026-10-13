@@ -156,7 +156,7 @@ export default function SpotlistsPage() {
             <h1 className="mt-3 font-serif text-3xl text-white sm:text-5xl">
               Spotlists
             </h1>
-[17/09/2026 18:14] Meder.code: <p className="mt-3 max-w-xl text-sm leading-6 text-white/45 sm:text-base">
+ <p className="mt-3 max-w-xl text-sm leading-6 text-white/45 sm:text-base">
               Create collections of places for your moods, plans,
               people, and future adventures.
             </p>

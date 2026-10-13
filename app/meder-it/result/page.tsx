@@ -1,6 +1,7 @@
  "use client";
 
 import Link from "next/link";
+import { trackEvent } from "@/Lib/analytics";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -389,16 +390,12 @@ function getOpeningHours(
 function getTimeLabels(
   practicalData: Record<string, unknown>
 ): string[] {
+
   const hours = getOpeningHours(practicalData);
-
-  if (!hours) {
-    return [];
-  }
-
   if (!Array.isArray(hours)) {
     return [];
   }
-
+  
   const labels: string[] = [];
 
   for (const item of hours) {
@@ -427,16 +424,25 @@ function getTimeLabels(
       continue;
     }
 
+    // We have valid opening-hour data for this day.
     labels.push("Today");
 
-    const closeHour = Number(close.split(":")[0]);
     const openHour = Number(open.split(":")[0]);
- if (
+    const closeHour = Number(close.split(":")[0]);
+
+    if (
       Number.isFinite(openHour) &&
-      Number.isFinite(closeHour) &&
-      (closeHour >= 17 || openHour >= 17)
+      Number.isFinite(closeHour)
     ) {
-      labels.push("Tonight");
+      // A place that opens during the evening
+      // or stays open into the evening supports "Tonight".
+      if (
+        openHour >= 17 ||
+        closeHour >= 17 ||
+        closeHour < openHour
+      ) {
+        labels.push("Tonight");
+      }
     }
 
     if (
@@ -711,6 +717,29 @@ export default function MederItResultPage() {
         "meder-decision"
       );
 
+      const [resultsTracked, setResultsTracked] = useState(false);
+      useEffect(() => {
+  if (resultsTracked) return;
+  if (loading) return;
+  if (results.length === 0) return;
+
+  setResultsTracked(true);
+
+  void trackEvent({
+    eventName: "meder_it_results_shown",
+    placeId: results[0]?.place.id,
+    metadata: {
+      result_count: results.length,
+      surprise_mode: surpriseMode,
+    },
+  });
+}, [
+  loading,
+  results,
+  surpriseMode,
+  resultsTracked,
+]);
+
     const surprise =
       sessionStorage.getItem(
         "meder-surprise"
@@ -838,21 +867,15 @@ export default function MederItResultPage() {
         );
 
       return {
-        ...place,
-        distance:
-          formatDistance(distanceKm),
-        travelTime:
-          formatApproxTravelTime(
-            distanceKm
-          ),
-        location:
-          distanceKm <= 5
-            ? unique([
-                ...place.location,
-                "Near Me",
-              ])
-            : place.location,
-      };
+  ...place,
+  distance: formatDistance(distanceKm),
+  distanceKm,
+  travelTime: formatApproxTravelTime(distanceKm),
+  location:
+    distanceKm <= 5
+      ? unique([...place.location, "Near Me"])
+      : place.location,
+};
     });
   }, [places, userLocation]);
 
@@ -956,92 +979,144 @@ export default function MederItResultPage() {
   ]);
 
   const whyReasons = useMemo(() => {
-    if (!bestMatch) {
-      return [];
-    }
-
-    const reasons = [
-      ...bestMatch.reasons,
-    ];
-
-    if (
-      selections.location?.includes(
-        "Near Me"
-      ) &&
-      bestMatch.place.distance
-    ) {
-      reasons.push(
-        "About " +
-          bestMatch.place.distance +
-          " from you"
-      );
-    }
-
-    if (
-      selections.what &&
-      selections.what.length > 0
-    ) {
-      reasons.push(
-        "Matches what you want to do"
-      );
-    }
-
-    if (
-      selections.vibe &&
-      selections.vibe.length > 0
-    ) {
-      reasons.push(
-        "Matches your preferred vibe"
-      );
-    }
-
-    if (
-      selections.budget &&
-      selections.budget.length > 0
-    ) {
-      reasons.push(
-        "Fits your selected budget"
-      );
-    }
-
-    if (
-      selections.who &&
-      selections.who.length > 0
-    ) {
-      reasons.push(
-        "Fits your group"
-      );
-    }
-
-    return Array.from(
-      new Set(reasons)
-    ).slice(0, 4);
-  }, [
-    bestMatch,
-    selections,
-  ]);
-
-  function toggleSaved(
-    placeId: string
-  ) {
-    setSavedPlaces((current) => {
-      const exists =
-        current.includes(placeId);
-
-      const updated = exists
-        ? current.filter(
-            (id) => id !== placeId
-          )
-        : [...current, placeId];
-
-      localStorage.setItem(
-        "meder-saved-places",
-        JSON.stringify(updated)
-      );
-
-      return updated;
-    });
+  if (!bestMatch) {
+    return [];
   }
+
+  const reasons: string[] = [];
+
+  const place = bestMatch.place;
+
+  // Use the actual matching reasons first.
+  for (const reason of bestMatch.reasons) {
+    if (!reasons.includes(reason)) {
+      reasons.push(reason);
+    }
+  }
+
+  // Make location explanation specific.
+  if (
+    selections.location?.includes("Near Me") &&
+    place.distance
+  ) {
+    reasons.push(`About ${place.distance} from you`);
+  } else if (
+    selections.location &&
+    selections.location.length > 0 &&
+    place.area
+  ) {
+    reasons.push(`Located in ${place.area}`);
+  }
+
+  // Make the "what" explanation specific.
+  if (
+    selections.what &&
+    selections.what.length > 0
+  ) {
+    const matchedWhat =
+      selections.what.filter((value) =>
+        place.what.includes(value)
+      );
+
+    if (matchedWhat.length > 0) {
+      reasons.push(
+        `Good for ${matchedWhat
+          .join(" and ")
+          .toLowerCase()}`
+      );
+    }
+  }
+
+  // Make the vibe explanation specific.
+  if (
+    selections.vibe &&
+    selections.vibe.length > 0
+  ) {
+    const matchedVibe =
+      selections.vibe.filter((value) =>
+        place.vibe.includes(value)
+      );
+
+    if (matchedVibe.length > 0) {
+      reasons.push(
+        `${matchedVibe
+          .join(" and ")} vibe`
+      );
+    }
+  }
+
+  // Budget explanation.
+  if (
+    selections.budget &&
+    selections.budget.length > 0
+  ) {
+    const matchedBudget =
+      selections.budget.filter((value) =>
+        place.budget.includes(value)
+      );
+
+    if (matchedBudget.length > 0) {
+      reasons.push(
+        `Fits the ${matchedBudget[0].toLowerCase()} budget`
+      );
+    }
+  }
+
+  // Group explanation.
+  if (
+    selections.who &&
+    selections.who.length > 0
+  ) {
+    const matchedWho =
+      selections.who.filter((value) =>
+        place.who.includes(value)
+      );
+
+    if (matchedWho.length > 0) {
+      reasons.push(
+        `Works well for ${matchedWho
+          .join(" and ")
+          .toLowerCase()}`
+      );
+    }
+  }
+
+  return Array.from(
+    new Set(reasons)
+  ).slice(0, 4);
+}, [
+  bestMatch,
+  selections,
+]);
+
+function toggleSaved(placeId: string) {
+  setSavedPlaces((current) => {
+    const exists = current.includes(placeId);
+
+    const updated = exists
+      ? current.filter((id) => id !== placeId)
+      : [...current, placeId];
+
+    localStorage.setItem(
+      "meder-saved-places",
+      JSON.stringify(updated)
+    );
+
+    void trackEvent({
+      eventName: exists
+        ? "place_unsaved"
+        : "place_saved",
+      placeId,
+      metadata: {
+        source: "meder_it_results",
+      },
+    });
+
+    return updated;
+  });
+}
+
+  
  function clearDecision() {
     sessionStorage.removeItem(
       "meder-decision"
@@ -1172,7 +1247,7 @@ export default function MederItResultPage() {
             <ArrowLeft size={17} />
             Back to MEDER IT
           </Link>
-[17/09/2026 17:14] Meder.code: {surpriseMode && (
+ {surpriseMode && (
             <div className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 px-4 py-2 text-xs text-[#D4AF37]">
               <Sparkles size={14} />
               Surprise Me

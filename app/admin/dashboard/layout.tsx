@@ -13,7 +13,13 @@ export default async function AdminDashboardLayout({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/admin");
+    redirect("/sign-in");
+  }
+
+  const { data: isAdmin, error } = await supabase.rpc("is_admin");
+
+  if (error || !isAdmin) {
+    redirect("/");
   }
 
   return <>{children}</>;

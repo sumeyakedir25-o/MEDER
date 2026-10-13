@@ -94,28 +94,44 @@ function AdminMediaNewPage() {
   }, [placeId, editId]);
 
   function handleFileChange(
-    event: ChangeEvent<HTMLInputElement>
-  ) {
-    const file = event.target.files?.[0];
+  event: ChangeEvent<HTMLInputElement>
+) {
+  const file = event.target.files?.[0];
 
-    if (!file) return;
+  if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setMessage("Please select an image file.");
-      return;
-    }
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+  ];
 
-    if (file.size > 10 * 1024 * 1024) {
-      setMessage("Image must be smaller than 10MB.");
-      return;
-    }
-
-    setMessage("");
-    setSelectedFile(file);
-
-    const localPreview = URL.createObjectURL(file);
-    setPreviewUrl(localPreview);
+  if (!allowedTypes.includes(file.type)) {
+    setMessage(
+      "Please select a JPG, PNG, or WEBP image."
+    );
+    event.target.value = "";
+    return;
   }
+
+  const maxSize = 10 * 1024 * 1024;
+
+  if (file.size > maxSize) {
+    setMessage(
+      "Image must be 10MB or smaller."
+    );
+    event.target.value = "";
+    return;
+  }
+
+  setMessage("");
+  setSelectedFile(file);
+
+  const localPreview =
+    URL.createObjectURL(file);
+
+  setPreviewUrl(localPreview);
+}
 
   function removeSelectedFile() {
     setSelectedFile(null);
@@ -395,8 +411,8 @@ function AdminMediaNewPage() {
                       </p>
 
                       <input
-                        type="file"
-                        accept="image/*"
+  type="file"
+  accept="image/jpeg,image/png,image/webp"
                         onChange={handleFileChange}
                         className="hidden"
                       />

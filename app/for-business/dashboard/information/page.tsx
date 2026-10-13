@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import BusinessUpdateRequest from "@/components/meder/BusinessUpdateRequest";
 import {
   ArrowLeft,
   Building2,
@@ -184,6 +185,7 @@ export default function BusinessInformationPage() {
             decisions.
           </p>
         </div>
+        <BusinessUpdateRequest placeId={business.id} />
 
         <form
           onSubmit={handleSubmit}

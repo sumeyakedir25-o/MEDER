@@ -277,7 +277,7 @@ export default function MapPage() {
                 Location found
               </div>
             )}
-[17/09/2026 17:52] Meder.code: {locationStatus === "denied" && (
+ {locationStatus === "denied" && (
             <div className="absolute bottom-4 left-4 z-[1000] max-w-xs rounded-xl border border-red-500/20 bg-black/80 px-4 py-3 text-xs text-white/70 backdrop-blur-md">
               Location permission was denied.
             </div>

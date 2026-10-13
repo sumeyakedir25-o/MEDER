@@ -4,6 +4,8 @@ import ExperienceTagSummary from "@/components/meder/ExperienceTagSummary";
 import ExperienceCards from "@/components/meder/ExperienceCards";
 import ExperienceSubmission from "@/components/meder/ExperienceSubmission";
 import MederMap from "@/components/meder/MederMap";
+import FreshnessBadge from "@/components/place/freshnessbadge";
+import { trackEvent } from "@/Lib/analytics";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -32,6 +34,7 @@ type PlaceMedia = {
   sort_order: number;
   is_cover: boolean;
   is_featured: boolean;
+  last_verified_at: string | null;
 };
 
 type PlaceMenuItem = {
@@ -374,6 +377,10 @@ const [relatedLoading, setRelatedLoading] = useState(true);
     communityVideos: data.communityVideos || [],
   });
 }
+trackEvent({
+  eventName: "place_viewed",
+  placeId: data.id,
+});
 
     setPlaceLoading(false);
   }
@@ -510,6 +517,7 @@ const [relatedLoading, setRelatedLoading] = useState(true);
       setSaved(false);
     }
   }, [place]);
+
 
   /*
    * Reset active photo whenever place changes
@@ -913,6 +921,12 @@ if (!place) {
                 <h1 className="font-serif text-3xl text-white sm:text-5xl">
                   {place.name}
                 </h1>
+
+                <div className="mt-3">
+  <FreshnessBadge
+    lastVerifiedAt={place.last_verified_at}
+  />
+</div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/60">
 
@@ -1399,6 +1413,15 @@ if (!place) {
                   {place.phone && (
                     <a
                       href={`tel:${place.phone}`}
+                      onClick={() =>
+  trackEvent({
+    eventName: "contact_clicked",
+    placeId: place.id,
+    metadata: {
+      method: "phone",
+    },
+  })
+}
                       className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-5 text-sm font-medium text-white transition hover:border-[#D4AF37]/40 hover:text-[#D4AF37]"
                     >
                       <Phone className="h-4 w-4" />
@@ -1412,6 +1435,15 @@ if (!place) {
                         /\D/g,
                         ""
                       )}`}
+                      onClick={() =>
+  trackEvent({
+    eventName: "contact_clicked",
+    placeId: place.id,
+    metadata: {
+      method: "whatsapp",
+    },
+  })
+}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#D4AF37] px-5 text-sm font-semibold text-black transition hover:bg-[#E5C158]"

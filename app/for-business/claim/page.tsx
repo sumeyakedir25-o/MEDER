@@ -78,40 +78,64 @@ export default function BusinessClaimPage() {
   );
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  event.preventDefault();
 
-    if (!selectedPlace) {
-      return;
-    }
+  if (!selectedPlace) {
+    alert("Please select a business first.");
+    return;
+  }
 
-    setSubmitting(true);
+  const form = new FormData(event.currentTarget);
 
-    const form = new FormData(event.currentTarget);
+  const ownerName = String(form.get("ownerName") || "").trim();
+  const email = String(form.get("email") || "").trim();
+  const phone = String(form.get("phone") || "").trim();
 
-    const ownerName = String(form.get("ownerName") || "").trim();
-    const email = String(form.get("email") || "").trim();
-    const phone = String(form.get("phone") || "").trim();
+  // Basic input validation
+  if (ownerName.length < 2 || ownerName.length > 100) {
+    alert("Please enter a valid name.");
+    return;
+  }
 
-    const { error } = await supabase
-      .from("business_claims")
-      .insert({
-        place_id: selectedPlace.id,
-        owner_name: ownerName,
-        email,
-        phone: phone || null,
-        status: "pending",
-      });
+  if (email.length > 254) {
+    alert("Please enter a valid email address.");
+    return;
+  }
 
-    if (error) {
-      console.error("Claim submission failed:", error);
-      alert(`We couldn't submit your claim: ${error.message}`);
-      setSubmitting(false);
-      return;
-    }
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+  if (!emailPattern.test(email)) {
+    alert("Please enter a valid email address.");
+    return;
+  }
+
+  if (phone.length < 7 || phone.length > 30) {
+    alert("Please enter a valid phone number.");
+    return;
+  }
+
+  setSubmitting(true);
+
+  const { error } = await supabase
+    .from("business_claims")
+    .insert({
+      place_id: selectedPlace.id,
+      owner_name: ownerName,
+      email,
+      phone,
+      status: "pending",
+    });
+
+  if (error) {
+    console.error("Claim submission failed:", error);
+    alert(`We couldn't submit your claim: ${error.message}`);
     setSubmitting(false);
-    setSubmitted(true);
-  };
+    return;
+  }
+
+  setSubmitting(false);
+  setSubmitted(true);
+};
 
   if (submitted) {
     return (

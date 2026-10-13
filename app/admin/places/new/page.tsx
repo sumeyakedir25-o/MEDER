@@ -157,21 +157,6 @@ const verificationSources = [
   "User Contribution",
 ];
 
-const areas = [
-  "Bole",
-  "Kazanchis",
-  "Piassa",
-  "Mexico",
-  "CMC",
-  "Gerji",
-  "Sar Bet",
-  "4 Kilo",
-  "6 Kilo",
-  "Old Airport",
-  "Megenagna",
-  "Other",
-];
-
 type SectionProps = {
   title: string;
   description: string;
@@ -402,11 +387,13 @@ const isEditing = !!editId;
   const [reservationUrl, setReservationUrl] = useState("");
 
   const [coverImage, setCoverImage] = useState("");
+  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
   const [featuredVideo, setFeaturedVideo] = useState("");
 
   const [verificationStatus, setVerificationStatus] = useState("Unverified");
-  const [verificationSource, setVerificationSource] = useState("");
-  const [verificationNotes, setVerificationNotes] = useState("");
+const [verificationSource, setVerificationSource] = useState("");
+const [verificationNotes, setVerificationNotes] = useState("");
+const [lastVerifiedAt, setLastVerifiedAt] = useState<string | null>(null);
 
   const [status, setStatus] = useState<"draft" | "published">("draft");
   const [saving, setSaving] = useState(false);
@@ -549,9 +536,9 @@ const isEditing = !!editId;
     );
 
     setVerificationStatus(data.verification_status || "Unverified");
-    setVerificationSource(practical.verification_source || "");
-    setVerificationNotes(practical.verification_notes || "");
-
+setVerificationSource(practical.verification_source || "");
+setVerificationNotes(practical.verification_notes || "");
+setLastVerifiedAt(data.last_verified_at || null);
     setStatus(
       data.status === "published"
         ? "published"
@@ -607,6 +594,12 @@ const cmsVibes = cmsCategories
 const cmsCuisines = cmsCategories
   .filter((item) => item.category_group === "cuisine")
   .map((item) => item.name);
+
+  const cmsLocations = cmsCategories
+  .filter((item) => item.category_group === "location")
+  .map((item) => item.name);
+
+  const areas = [...cmsLocations, "Other"];
 
   const completeness = useMemo(() => {
   const sections = [
@@ -691,6 +684,34 @@ const cmsCuisines = cmsCategories
   }
 }
     setSaving(true);
+    let coverImageUrl = coverImage.trim();
+
+if (coverImageFile) {
+  const extension =
+    coverImageFile.name.split(".").pop()?.toLowerCase() || "jpg";
+
+  const filePath = `covers/${crypto.randomUUID()}.${extension}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("place-media")
+    .upload(filePath, coverImageFile, {
+      upsert: false,
+      contentType: coverImageFile.type,
+    });
+
+  if (uploadError) {
+    console.error(uploadError);
+    setMessage(`Image upload failed: ${uploadError.message}`);
+    setSaving(false);
+    return;
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from("place-media")
+    .getPublicUrl(filePath);
+
+  coverImageUrl = publicUrlData.publicUrl;
+}
  const slug =
       name
         .trim()
@@ -744,6 +765,11 @@ const cmsCuisines = cmsCategories
   verification_source: verificationSource,
   verification_notes: verificationNotes,
 };
+const nextLastVerifiedAt =
+  verificationStatus === "MEDER Verified" ||
+  verificationStatus === "Business Verified"
+    ? lastVerifiedAt || new Date().toISOString()
+    : null;
 
     const placeData = {
   name: name.trim(),
@@ -774,12 +800,13 @@ const cmsCuisines = cmsCategories
     ...selectedExperiences.map((item) => `Experience: ${item}`),
     ...selectedVibes.map((item) => `Vibe: ${item}`),
   ],
-  cover_image: coverImage.trim(),
-  photos: [coverImage.trim()],
+  cover_image: coverImageUrl,
+photos: coverImageUrl ? [coverImageUrl] : [],
   tiktok_url: tiktok.trim() || null,
   featured_video_url: featuredVideo.trim() || null,
   practical_data: practicalData,
   verification_status: verificationStatus,
+last_verified_at: nextLastVerifiedAt,
 };
 
 const { error } = isEditing
@@ -1420,14 +1447,58 @@ const { error } = isEditing
                   </div>
                 </div>
 
-                <div>
-                  <FieldLabel>Cover image URL</FieldLabel>
-                  <Input
-                    value={coverImage}
-                    onChange={setCoverImage}
-                    placeholder="https://..."
-                  />
-                </div>
+                <div className="space-y-3">
+  <FieldLabel>Cover Image</FieldLabel>
+
+  <label className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-[#D4AF6A] bg-[#0F0F0F] px-5 py-4 text-sm font-semibold text-[#D4AF6A] transition hover:bg-[#D4AF6A]/10">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 16V4" />
+      <path d="m7 9 5-5 5 5" />
+      <path d="M20 16.5v2A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5v-2" />
+    </svg>
+
+    <span>
+      {coverImageFile
+        ? "Choose a Different Image"
+        : "Choose Cover Image"}
+    </span>
+
+    <input
+      type="file"
+      accept="image/*"
+      className="hidden"
+      onChange={(event) =>
+        setCoverImageFile(event.target.files?.[0] ?? null)
+      }
+    />
+  </label>
+
+  {coverImageFile && (
+    <p className="text-sm text-green-500">
+      ✓ Selected: {coverImageFile.name}
+    </p>
+  )}
+
+  {!coverImageFile && coverImage && (
+    <p className="text-sm text-gray-400">
+      Current cover image is saved.
+    </p>
+  )}
+
+  <p className="text-xs text-gray-500">
+    Select an image from your device to use as this place's cover.
+  </p>
+</div>
 
                 <div className="grid gap-5 md:grid-cols-2">
                   <div>

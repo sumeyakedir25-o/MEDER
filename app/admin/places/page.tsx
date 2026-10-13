@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/Lib/supabase/client";
+import FreshnessBadge from "@/components/place/freshnessbadge";
 
 type Place = {
   id: string;
@@ -14,6 +15,7 @@ type Place = {
   verification_status: string | null;
   created_at: string;
   updated_at: string;
+  last_verified_at: string | null;
 };
 
 export default function AdminPlacesPage() {
@@ -30,8 +32,8 @@ export default function AdminPlacesPage() {
     const { data, error } = await supabase
       .from("places")
       .select(
-        "id, name, type, category, area, status, verification_status, created_at, updated_at"
-      )
+  "id, name, type, category, area, status, verification_status, last_verified_at, created_at, updated_at"
+)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -230,6 +232,18 @@ async function restorePlace(placeId: string, placeName: string) {
                         {place.verification_status}
                       </p>
                     )}
+                    <div>
+  <p className="text-sm text-white/50">
+    {place.verification_status || "Unverified"}
+  </p>
+
+  <div className="mt-2">
+    <FreshnessBadge
+      lastVerifiedAt={place.last_verified_at}
+      compact
+    />
+  </div>
+</div>
                   </div>
 
                   {/* Actions */}

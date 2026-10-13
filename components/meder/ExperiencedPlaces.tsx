@@ -165,7 +165,7 @@ export default function ExperiencedPlaces() {
             Places where you shared your experience with the MEDER community.
           </p>
         </div>
-[17/09/2026 18:28] Meder.code: <div className="rounded-full border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-3 py-1.5 text-xs font-medium text-[#D4AF37]">
+ <div className="rounded-full border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-3 py-1.5 text-xs font-medium text-[#D4AF37]">
           {experiencedPlaceCards.length}{" "}
           {experiencedPlaceCards.length === 1
             ? "place"

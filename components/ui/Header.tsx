@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import Image from "next/image";
+import { useEffect, useState } from "react";
+import { createClient } from "@/Lib/supabase/client";
 import {
   Bookmark,
   Compass,
@@ -13,6 +15,28 @@ import {
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+useEffect(() => {
+  const checkAdmin = async () => {
+    const supabase = createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setIsAdmin(false);
+      return;
+    }
+
+    const { data } = await supabase.rpc("is_admin");
+
+    setIsAdmin(data === true);
+  };
+
+  checkAdmin();
+}, []);
 
   const closeMenu = () => {
     setIsMenuOpen(false);
@@ -24,14 +48,23 @@ export default function Header() {
 
         {/* Brand */}
         <Link
-          href="/"
-          onClick={closeMenu}
-          aria-label="MEDER home"
-          className="shrink-0 font-serif text-2xl font-semibold tracking-[0.08em] text-[#D4AF37] transition hover:text-[#E5C158]"
-        >
-          MEDER
-        </Link>
-
+  href="/"
+  onClick={closeMenu}
+  aria-label="MEDER home"
+  className="flex shrink-0 items-center gap-2 text-[#D4AF37] transition hover:text-[#E5C158]"
+>
+  <Image
+    src="/Image.png"
+    alt="MEDER logo"
+    width={36}
+    height={36}
+    className="h-9 w-9 object-contain"
+    priority
+  />
+  <span className="font-serif text-2xl font-semibold tracking-[0.08em]">
+    MEDER
+  </span>
+</Link>
         {/* Desktop Navigation */}
         <nav
           aria-label="Main navigation"
@@ -90,13 +123,13 @@ export default function Header() {
           </Link>
         </nav>
 
-        <Link
-  href="/admin"
-  className="rounded-lg border border-[#D4AF37]/30 px-4 py-2 text-sm font-medium text-[#D4AF37] transition hover:bg-[#D4AF37]/10"
->
-  Admin
-</Link>
-
+  <Link
+    href="/admin"
+    aria-label="Admin access"
+    className="inline-block h-10 w-10 shrink-0"
+  >
+    <span className="sr-only">Admin access</span>
+  </Link>
         {/* Desktop Actions */}
         <div className="hidden items-center gap-2 lg:flex">
           <Link
@@ -212,15 +245,13 @@ export default function Header() {
             >
               For Business
             </Link>
-
-            <Link
-  href="/admin"
-  onClick={closeMenu}
-  className="rounded-lg border border-[#D4AF37]/30 px-4 py-3 text-sm font-medium text-[#D4AF37] transition hover:bg-[#D4AF37]/10"
->
-  Admin
-</Link>
-
+  <Link
+    href="/admin"
+    onClick={closeMenu}
+    className="rounded-lg border border-[#D4AF37]/30 px-4 py-3 text-sm font-medium text-[#D4AF37] transition hover:bg-[#D4AF37]/10"
+  >
+    Admin
+  </Link>
             {/* My Explorer */}
             <Link
               href="/explorer"

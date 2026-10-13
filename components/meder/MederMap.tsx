@@ -7,7 +7,7 @@ import { useEffect } from "react";
 
 type MederMapProps = {
   latitude: number;
-  longitude: number;
+  longitude: number; 
   placeName: string;
 };
 
