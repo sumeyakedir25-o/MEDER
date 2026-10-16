@@ -305,7 +305,7 @@ function getMederPlace(place: SupabasePlace): MederPlace {
           </section>
         ) : view === "map" ? (
           mapPlaces.length > 0 ? (
-            <MederMap places={mapPlaces} />
+            <MederMap places={places} userLocation={null} />
           ) : (
             <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-10 text-center">
               <h2 className="font-serif text-2xl text-white">
