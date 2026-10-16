@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { Eye, EyeOff, Lock, Mail, ArrowLeft } from "lucide-react";
+import { createClient } from "@/Lib/supabase/client";
 
 export default function SignInPage() {
   const [email, setEmail] = useState("");
@@ -11,58 +12,46 @@ export default function SignInPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+ const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  event.preventDefault();
 
-    setError("");
-    setSuccess("");
+  setError("");
+  setSuccess("");
 
-    if (!email.trim() || !password) {
-      setError("Please enter your email and password.");
-      return;
-    }
+  if (!email.trim() || !password) {
+    setError("Please enter your email and password.");
+    return;
+  }
 
-    if (!email.includes("@")) {
-      setError("Please enter a valid email address.");
-      return;
-    }
+  if (!email.includes("@")) {
+    setError("Please enter a valid email address.");
+    return;
+  }
 
-    const storedUser = localStorage.getItem("meder-user");
+  try {
+    const supabase = createClient();
 
-    if (!storedUser) {
-      setError("No account found. Please create an account first.");
-      return;
-    }
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
 
-    try {
-      const user = JSON.parse(storedUser);
-
-      if (
-        user.email?.toLowerCase() !== email.trim().toLowerCase() ||
-        user.password !== password
-      ) {
-        setError("Incorrect email or password.");
-        return;
-      }
-
-      localStorage.setItem(
-        "meder-current-user",
-        JSON.stringify({
-          name: user.name,
-          email: user.email,
-          loggedInAt: new Date().toISOString(),
-        }),
+    if (signInError) {
+      setError(
+        signInError.message === "Invalid login credentials"
+          ? "Incorrect email or password."
+          : signInError.message
       );
-
-      setSuccess("Welcome back to MEDER!");
-
-      setTimeout(() => {
-        window.location.href = "/explorer";
-      }, 700);
-    } catch {
-      setError("Something went wrong. Please try again.");
+      return;
     }
-  };
+
+    setSuccess("Welcome back to MEDER!");
+
+    window.location.href = "/explorer";
+  } catch {
+    setError("Something went wrong. Please try again.");
+  }
+};
 
   return (
     <main className="min-h-screen bg-black px-4 py-10 text-white sm:px-6">
@@ -198,7 +187,7 @@ export default function SignInPage() {
               Don't have an account?{" "}
               <Link
                 href="/sign-up"
-                className="font-medium text-[#D4AF37] transition hover:text-[#E5C158]"
+                className="font-extrabold !text-[#D4AF37] transition hover:!text-[#F5D778]"
               >
                 Create one
               </Link>

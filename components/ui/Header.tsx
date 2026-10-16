@@ -16,14 +16,17 @@ import {
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState(false);
 
 useEffect(() => {
-  const checkAdmin = async () => {
-    const supabase = createClient();
+  const supabase = createClient();
 
+  const checkUser = async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    setIsSignedIn(!!user);
 
     if (!user) {
       setIsAdmin(false);
@@ -31,11 +34,22 @@ useEffect(() => {
     }
 
     const { data } = await supabase.rpc("is_admin");
-
     setIsAdmin(data === true);
   };
 
-  checkAdmin();
+  checkUser();
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, session) => {
+    setIsSignedIn(!!session?.user);
+
+    if (!session?.user) {
+      setIsAdmin(false);
+    }
+  });
+
+  return () => subscription.unsubscribe();
 }, []);
 
   const closeMenu = () => {
@@ -149,12 +163,21 @@ useEffect(() => {
           </Link>
 
           {/* Profile / Sign In */}
-          <Link
-            href="/sign-in"
-            className="ml-2 rounded-full bg-[#D4AF37] px-5 py-2 text-sm font-semibold text-black transition hover:bg-[#E5C158]"
-          >
-            Sign In
-          </Link>
+          {isSignedIn ? (
+  <Link
+    href="/explorer"
+    className="ml-2 rounded-full bg-[#D4AF37] px-5 py-2 text-sm font-bold text-black transition hover:bg-[#E5C158]"
+  >
+    Profile
+  </Link>
+) : (
+  <Link
+    href="/sign-in"
+    className="ml-2 rounded-full bg-[#D4AF37] px-5 py-2 text-sm font-bold text-black transition hover:bg-[#E5C158]"
+  >
+    Sign In
+  </Link>
+)}
         </div>
 
         {/* Mobile Actions */}
@@ -273,13 +296,23 @@ useEffect(() => {
               Saved Places
             </Link>
 
-            <Link
-              href="/sign-in"
-              onClick={closeMenu}
-              className="mt-1 rounded-full bg-[#D4AF37] px-4 py-3 text-center text-sm font-semibold text-black transition hover:bg-[#E5C158]"
-            >
-              Sign In
-            </Link>
+            {isSignedIn ? (
+  <Link
+    href="/explorer"
+    onClick={closeMenu}
+    className="mt-1 rounded-full bg-[#D4AF37] px-4 py-3 text-center text-sm font-bold text-black transition hover:bg-[#E5C158]"
+  >
+    Profile
+  </Link>
+) : (
+  <Link
+    href="/sign-in"
+    onClick={closeMenu}
+    className="mt-1 rounded-full bg-[#D4AF37] px-4 py-3 text-center text-sm font-bold text-black transition hover:bg-[#E5C158]"
+  >
+    Sign In
+  </Link>
+)}
           </div>
         </nav>
       )}

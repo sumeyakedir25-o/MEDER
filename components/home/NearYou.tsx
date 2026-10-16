@@ -18,27 +18,25 @@ type NearbyPlace = {
   longitude: number | null;
 };
 
-function getPlaceImage(place: any) {
-  if (place.cover_image) {
-    return place.cover_image;
-  }
+function getPlaceImage(place: {
+  cover_image?: string | null;
+  photos?: string[] | null;
+}) {
+  if (place.cover_image) return place.cover_image;
 
-  if (
-    Array.isArray(place.photos) &&
-    place.photos.length > 0 &&
-    place.photos[0]
-  ) {
+  if (Array.isArray(place.photos) && place.photos[0]) {
     return place.photos[0];
   }
 
   return "/placeholder-place.jpg";
 }
 
-function getRating(place: any) {
+function getRating(place: { practical_data?: unknown }) {
+  const data = place.practical_data;
+
   const practicalData =
-    place.practical_data &&
-    typeof place.practical_data === "object"
-      ? place.practical_data
+    data && typeof data === "object"
+      ? (data as Record<string, unknown>)
       : {};
 
   const rating = Number(
@@ -48,7 +46,19 @@ function getRating(place: any) {
       0,
   );
 
-  return Number.isFinite(rating) ? rating : 0;
+  return Number.isFinite(rating) && rating >= 0 ? rating : 0;
+}
+
+function getCoordinate(value: unknown): number | null {
+  if (value === null|| value === undefined||value === "") {
+    return null;
+  }
+
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) return null;
+
+  return number;
 }
 
 function calculateDistance(
@@ -63,11 +73,10 @@ function calculateDistance(
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
 
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) *
       Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+      Math.sin(dLon / 2) ** 2;
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
@@ -82,123 +91,155 @@ function formatDistance(distanceKm: number) {
   return `${distanceKm.toFixed(1)} km`;
 }
 
+function shufflePlaces(places: NearbyPlace[]) {
+  const shuffled = [...places];
+
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  return shuffled;
+}
+
 export default function NearYou() {
   const [places, setPlaces] = useState<NearbyPlace[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadNearbyPlaces() {
-      const supabase = createClient();
+      try {
+        const supabase = createClient();
 
-      const { data, error } = await supabase
-        .from("places")
-        .select(
-          "id, name, type, area, latitude, longitude, cover_image, photos, practical_data, created_at",
-        )
-        .eq("status", "published")
-        .order("created_at", { ascending: false })
-        .limit(20);
+        const { data, error } = await supabase
+          .from("places")
+          .select(
+            "id, name, type, latitude, longitude, cover_image, photos, practical_data, created_at",
+          )
+          .eq("status", "published");
 
-      if (error) {
-        console.error("Error loading nearby places:", error);
-        setLoading(false);
-        return;
-      }
+        if (cancelled) return;
 
-      const rawPlaces = data ?? [];
+        if (error) {
+          console.error("Error loading nearby places:", error);
+          setPlaces([]);
+          setLoading(false);
+          return;
+        }
 
-      const mappedPlaces: NearbyPlace[] = rawPlaces.map((place: any) => ({
-        id: place.id,
-        name: place.name,
-        type: place.type || "Place",
-        distance: "Nearby",
-        status: "Published",
-        rating: getRating(place),
-        image: getPlaceImage(place),
-        latitude:
-          typeof place.latitude === "number"
-            ? place.latitude
-            : Number.isFinite(Number(place.latitude))
-              ? Number(place.latitude)
-              : null,
-        longitude:
-          typeof place.longitude === "number"
-            ? place.longitude
-            : Number.isFinite(Number(place.longitude))
-              ? Number(place.longitude)
-              : null,
-      }));
+        const mappedPlaces: NearbyPlace[] = (data ?? []).map(
+          (place: any) => ({
+            id: place.id,
+            name: place.name,
+            type: place.type || "Place",
+            distance: "Distance unavailable",
+            status: "Published",
+            rating: getRating(place),
+            image: getPlaceImage(place),
+            latitude: getCoordinate(place.latitude),
+            longitude: getCoordinate(place.longitude),
+          }),
+        );
 
-      if (!navigator.geolocation) {
-        setPlaces(mappedPlaces.slice(0, 3));
-        setLoading(false);
-        return;
-      }
+        // No published places are available.
+        if (mappedPlaces.length === 0) {
+          setPlaces([]);
+          setLoading(false);
+          return;
+        }
 
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const userLatitude = position.coords.latitude;
-          const userLongitude = position.coords.longitude;
+        // Random fallback when geolocation is unavailable.
+        const showRandomPlaces = () => {
+          if (cancelled) return;
 
-          const sortedPlaces = mappedPlaces
-            .map((place) => {
-              if (
-                place.latitude === null ||
-                place.longitude === null
-              ) {
+          setPlaces(shufflePlaces(mappedPlaces).slice(0, 3));
+          setLoading(false);
+        };
+
+        if (!navigator.geolocation) {
+          showRandomPlaces();
+          return;
+        }
+ navigator.geolocation.getCurrentPosition(
+          (position) => {
+            if (cancelled) return;
+
+            const userLatitude = position.coords.latitude;
+            const userLongitude = position.coords.longitude;
+
+            const withCoordinates = mappedPlaces
+              .filter(
+                (place) =>
+                  place.latitude !== null &&
+                  place.longitude !== null,
+              )
+              .map((place) => {
+                const distanceKm = calculateDistance(
+                  userLatitude,
+                  userLongitude,
+                  place.latitude!,
+                  place.longitude!,
+                );
+
                 return {
                   ...place,
-                  distance: "Nearby",
+                  distanceKm,
+                  distance: formatDistance(distanceKm),
                 };
-              }
+              })
+              .sort((a, b) => a.distanceKm - b.distanceKm);
 
-              const distance = calculateDistance(
-                userLatitude,
-                userLongitude,
-                place.latitude,
-                place.longitude,
-              );
- return {
+            const withoutCoordinates = shufflePlaces(
+              mappedPlaces.filter(
+                (place) =>
+                  place.latitude === null ||
+                  place.longitude === null,
+              ),
+            );
+
+            // Show the closest places first.
+            // If fewer than three have coordinates, fill the
+            // remaining spots with random places.
+            const nearestPlaces = withCoordinates.slice(0, 3);
+            const remainingSlots = 3 - nearestPlaces.length;
+
+            const fallbackPlaces = withoutCoordinates
+              .slice(0, remainingSlots)
+              .map((place) => ({
                 ...place,
-                distance: formatDistance(distance),
-              };
-            })
-            .sort((a, b) => {
-              const distanceA = a.distance.endsWith("m")
-                ? Number.parseFloat(a.distance)
-                : Number.parseFloat(a.distance) * 1000;
+                distance: "Distance unavailable",
+              }));
 
-              const distanceB = b.distance.endsWith("m")
-                ? Number.parseFloat(b.distance)
-                : Number.parseFloat(b.distance) * 1000;
+            setPlaces([...nearestPlaces, ...fallbackPlaces]);
+            setLoading(false);
+          },
+          () => {
+            // Permission denied, timeout, or location unavailable.
+            showRandomPlaces();
+          },
+          {
+            enableHighAccuracy: false,
+            timeout: 8000,
+            maximumAge: 300000,
+          },
+        );
+      } catch (error) {
+        if (cancelled) return;
 
-              if (
-                Number.isNaN(distanceA) ||
-                Number.isNaN(distanceB)
-              ) {
-                return 0;
-              }
-
-              return distanceA - distanceB;
-            })
-            .slice(0, 3);
-
-          setPlaces(sortedPlaces);
-          setLoading(false);
-        },
-        () => {
-          setPlaces(mappedPlaces.slice(0, 3));
-          setLoading(false);
-        },
-        {
-          enableHighAccuracy: false,
-          timeout: 5000,
-          maximumAge: 300000,
-        },
-      );
+        console.error("Unable to load places:", error);
+        setPlaces([]);
+        setLoading(false);
+      }
     }
 
     loadNearbyPlaces();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -222,7 +263,6 @@ export default function NearYou() {
             className="flex shrink-0 items-center gap-1 text-xs font-medium text-[#D4AF37] transition hover:text-[#E5C158]"
           >
             See all
-
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -238,10 +278,10 @@ export default function NearYou() {
           ) : places.length === 0 ? (
             <div className="rounded-xl border border-white/10 bg-black/20 p-5 text-center">
               <p className="text-xs text-white/50">
-                No published places yet.
+                No published places available right now.
               </p>
             </div>
-          ) : (
+ ) : (
             places.map((place) => (
               <Link
                 key={place.id}
@@ -268,19 +308,18 @@ export default function NearYou() {
                     {place.type}
                   </p>
 
-                  <div className="mt-1 flex items-center gap-2 text-[10px]">
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px]">
                     <span className="flex items-center gap-1 text-white/55">
                       <MapPin className="h-3 w-3 text-[#D4AF37]" />
-
                       {place.distance}
                     </span>
 
                     <span className="text-emerald-400">
                       {place.status}
                     </span>
- <span className="flex items-center gap-1 text-white/70">
-                      <Star className="h-3 w-3 fill-[#D4AF37] text-[#D4AF37]" />
 
+                    <span className="flex items-center gap-1 text-white/70">
+                      <Star className="h-3 w-3 fill-[#D4AF37] text-[#D4AF37]" />
                       {place.rating > 0
                         ? place.rating.toFixed(1)
                         : "—"}

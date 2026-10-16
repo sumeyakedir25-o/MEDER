@@ -7,101 +7,149 @@ import { createClient } from "@/Lib/supabase/client";
 
 type Vibe = {
   name: string;
+  slug: string;
   description: string;
   image: string;
 };
 
-function getPlaceImage(place: any) {
-  if (place.cover_image) {
-    return place.cover_image;
-  }
+type PlaceImage = {
+  id: string;
+  type: string | null;
+  experiences: string[] | null;
+  cover_image: string | null;
+  photos: string[] | null;
+};
 
-  if (
-    Array.isArray(place.photos) &&
-    place.photos.length > 0 &&
-    place.photos[0]
-  ) {
-    return place.photos[0];
-  }
-
+function getPlaceImage(place: PlaceImage): string {
+  if (place.cover_image) return place.cover_image;
+  if (place.photos?.[0]) return place.photos[0];
   return "/placeholder-place.jpg";
 }
 
-function normalize(value: string) {
-  return value.trim().toLowerCase();
+function normalize(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^(vibe|experience|purpose|audience):\s*/, "")
+    .trim();
 }
 
-function placeHasVibe(place: any, vibeName: string) {
-  const target = normalize(vibeName);
+function placeMatchesCategory(place: PlaceImage, categoryName: string) {
+  const target = normalize(categoryName);
 
-  if (!Array.isArray(place.experiences)) {
-    return false;
-  }
+  const matchesExperience = (place.experiences ?? []).some(
+    (experience) =>
+      typeof experience === "string" &&
+      normalize(experience) === target,
+  );
 
-  return place.experiences.some((experience: string) => {
-    if (typeof experience !== "string") {
-      return false;
-    }
+  const matchesType =
+    typeof place.type === "string" &&
+    normalize(place.type) === target;
 
-    const value = experience.replace(/^vibe:\s*/i, "").trim();
-
-    return normalize(value) === target;
-  });
+  return matchesExperience || matchesType;
 }
+
+const CATEGORY_RENAMES: Record<string, string> = {
+  quiet: "Fast Food",
+  traditional: "Fun",
+};
 
 export default function ExperienceDiscovery() {
   const [vibes, setVibes] = useState<Vibe[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadVibes() {
       const supabase = createClient();
 
-      const [{ data: categories, error: categoryError }, { data: places }] =
-        await Promise.all([
-          supabase
-            .from("categories")
-            .select("name, slug, description, icon, sort_order")
-            .eq("group", "mood")
-            .order("sort_order", { ascending: true }),
+      const [
+        { data: categories, error: categoryError },
+        { data: places, error: placesError },
+      ] = await Promise.all([
+        supabase
+          .from("categories")
+          .select("name, slug, description, sort_order")
+          .eq("category_group", "mood")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true }),
 
-          supabase
-            .from("places")
-            .select("name, experiences, cover_image, photos")
-            .eq("status", "published"),
-        ]);
+        supabase
+          .from("places")
+          .select("id, type, experiences, cover_image, photos")
+          .eq("status", "published"),
+      ]);
 
-      if (categoryError) {
-        console.error("Error loading mood categories:", categoryError);
+      if (cancelled) return;
+
+      if (categoryError || placesError) {
+        console.error("Error loading vibe discovery:", {
+          categoryError,
+          placesError,
+        });
+        setVibes([]);
         setLoading(false);
         return;
       }
 
-      const publishedPlaces = places ?? [];
+      const publishedPlaces = (places ?? []) as PlaceImage[];
+      const usedPlaceIds = new Set<string>();
+
+      // Shuffle places on every homepage load.
+      for (let i = publishedPlaces.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [publishedPlaces[i], publishedPlaces[j]] = [
+          publishedPlaces[j],
+          publishedPlaces[i],
+        ];
+      }
 
       const mappedVibes: Vibe[] = (categories ?? [])
-        .map((category: any) => {
-          const matchingPlace = publishedPlaces.find((place: any) =>
-            placeHasVibe(place, category.name),
+        .slice(0, 6)
+        .map((category) => {
+          const originalName = category.name.trim();
+
+          const displayName =
+            CATEGORY_RENAMES[originalName.toLowerCase()] ?? originalName;
+
+          // Only use a place that belongs to this specific category.
+          const matchingPlace = publishedPlaces.find(
+            (place) =>
+              !usedPlaceIds.has(place.id) &&
+              Boolean(place.cover_image || place.photos?.[0]) &&
+              placeMatchesCategory(place, displayName),
           );
 
+          if (matchingPlace) {
+            usedPlaceIds.add(matchingPlace.id);
+          }
+
           return {
-            name: category.name,
+            name: displayName,
+            slug: category.slug,
             description:
-              category.description ||
-              `Places with a ${category.name.toLowerCase()} vibe`,
+              displayName !== originalName
+                ? `Discover ${displayName.toLowerCase()} places.`
+                : category.description ||
+                  `Find places for a ${displayName.toLowerCase()} experience.`,
             image: matchingPlace
               ? getPlaceImage(matchingPlace)
               : "/placeholder-place.jpg",
           };
-        })
-        .slice(0, 6);
+        });
 
-      setVibes(mappedVibes);
-      setLoading(false);
+      if (!cancelled) {
+        setVibes(mappedVibes);
+        setLoading(false);
+      }
     }
 
     loadVibes();
+ return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -117,13 +165,13 @@ export default function ExperienceDiscovery() {
           </h2>
 
           <p className="mt-2 max-w-xl text-sm text-white/55 md:text-base">
-            Find something that fits the moment.
+            Find somewhere that matches your mood.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {loading ? (
-            Array.from({ length: 4 }).map((_, index) => (
+            Array.from({ length: 6 }).map((_, index) => (
               <div
                 key={index}
                 className="h-64 animate-pulse rounded-2xl border border-white/10 bg-white/[0.03]"
@@ -132,13 +180,13 @@ export default function ExperienceDiscovery() {
           ) : vibes.length === 0 ? (
             <div className="col-span-full rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center">
               <p className="text-sm text-white/50">
-                Vibes will appear here once they are added to the CMS.
+                No active vibe categories are available yet.
               </p>
             </div>
           ) : (
             vibes.map((vibe) => (
- <Link
-                key={vibe.name}
+              <Link
+                key={vibe.slug}
                 href={`/search?q=${encodeURIComponent(vibe.name)}`}
                 className="group relative block h-64 overflow-hidden rounded-2xl border border-white/10 text-left"
               >
@@ -147,7 +195,7 @@ export default function ExperienceDiscovery() {
                   alt={vibe.name}
                   fill
                   unoptimized
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   className="object-cover transition duration-500 group-hover:scale-105"
                 />
 

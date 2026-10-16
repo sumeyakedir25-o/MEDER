@@ -243,7 +243,10 @@ export default function MapPage() {
               </div>
             </div>
           ) : (
-            <MederMap places={places} />
+            <MederMap
+  places={places}
+  userLocation={userLocation}
+/>
           )}
 
           <div className="absolute left-4 top-4 z-[1000] rounded-xl border border-white/10 bg-black/80 px-4 py-3 backdrop-blur-md">

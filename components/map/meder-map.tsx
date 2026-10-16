@@ -3,8 +3,14 @@
 import dynamic from "next/dynamic";
 import type { MapPlace } from "@/app/map/page";
 
+type UserLocation = {
+  latitude: number;
+  longitude: number;
+} | null;
+
 interface MederMapProps {
   places: MapPlace[];
+  userLocation: UserLocation;
 }
 
 const LeafletMap = dynamic(
@@ -21,6 +27,12 @@ const LeafletMap = dynamic(
 
 export default function MederMap({
   places,
+  userLocation,
 }: MederMapProps) {
-  return <LeafletMap places={places} />;
+  return (
+    <LeafletMap
+      places={places}
+      userLocation={userLocation}
+    />
+  );
 }
